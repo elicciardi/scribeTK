@@ -1,5 +1,5 @@
 {
-  "name": "SLF Code Scribe",
+  "name": "Code Scribe / Timekeeper",
   "short_name": "Code Scribe",
   "description": "Cardiac arrest documentation tool for EMS providers",
   "start_url": "./index.html",
