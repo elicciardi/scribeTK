@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>SLF Code Scribe</title>
+<title>Code Scribe / Timekeeper</title>
 
 <!-- PWA: Installable as a home screen app -->
 <link rel="manifest" href="manifest.json">
@@ -610,11 +610,21 @@
     </div>
     <div style="margin-left: auto; display:flex; gap:5px;">
         <button class="btn-small blue" id="btn-archive" onclick="openArchive()">Archive</button>
-        <button class="btn-small" id="btn-undo" onclick="undoLastLog()">Undo</button>
+        <button class="btn-small hidden" id="btn-undo" onclick="undoLastLog()">Undo</button>
     </div>
 </div>
 
-<div id="main-dashboard">
+<!-- Pre-code start screen — shown before code start. Just a title and a big START button.
+     No clock, no timers, no Undo. Once START is tapped, this hides and #main-dashboard takes over. -->
+<div id="pre-code-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; padding: 20px;">
+    <div style="text-align: center; margin-bottom: 30px;">
+        <div style="font-size: 4em; margin-bottom: 8px;">🫀</div>
+        <h2 style="margin: 0; color: var(--primary-blue);">Code Scribe / Timekeeper</h2>
+    </div>
+    <button class="btn-large btn-red" id="btn-start-precode" onclick="openModal('modal-patient-type')" style="font-size: 1.3em; padding: 28px 40px; width: 100%; max-width: 360px; box-shadow: 0 6px 16px rgba(211,47,47,0.35);">START CODE</button>
+</div>
+
+<div id="main-dashboard" class="hidden">
 <div id="banner-20min" class="banner hidden">⚠️ 20 MINUTES EXCEEDED: Consider Termination Criteria</div>
 
 <!-- Handoff Report — appears at top after "Arrived at Receiving" tapped -->
@@ -639,7 +649,6 @@
             <div id="lucas-status" class="hidden" style="text-align:center; color:var(--primary-blue); font-weight:bold; margin-bottom:10px;">LUCAS Active</div>
             
             <div class="btn-grid" id="cpr-buttons-container">
-                <button class="btn-large btn-full btn-red" id="btn-start" onclick="openModal('modal-patient-type')">START CODE</button>
                 <button class="btn-large btn-gray hidden" id="btn-cpr" onclick="toggleCPR()">START CPR</button>
                 <button class="btn-large btn-gray hidden" id="btn-lucas" onclick="toggleLucas()">LUCAS</button>
             </div>
@@ -697,9 +706,13 @@
         </div>
 
         <div class="card hidden red-trim" id="card-push-epi" style="margin-top: 10px;">
+            <!-- X button cancels the timer (matches lido card pattern). Card itself stays hidden after cancel. -->
+            <button class="btn-small danger" onclick="cancelPushEpi()" aria-label="Cancel Push Dose Epi Timer" style="position:absolute; top:4px; right:4px; padding:2px 6px; font-size:0.7em; line-height:1; min-height:24px; min-width:24px;">×</button>
             <div class="timer-label">Next Push Dose Epi</div>
             <div id="push-epi-dose-label" class="hidden" style="text-align:center; color:var(--primary-blue); font-weight:bold; font-size:0.95em; margin-bottom:5px;"></div>
             <div class="time-display" id="clock-push-epi">1:00</div>
+            <!-- Overdue counter shown after timer hits 0 (same pattern as epi/lido). -->
+            <div class="time-overdue hidden" id="push-epi-overdue"></div>
             <button class="btn-large btn-full" onclick="logPushEpi()">GIVE PUSH DOSE EPI</button>
         </div>
 
@@ -708,14 +721,19 @@
             <div class="time-display" id="clock-rosc">00:00</div>
             <button class="btn-large btn-full btn-red" onclick="reArrest()" style="margin-bottom: 15px;">RE-ARREST</button>
             
-            <h4 style="margin-bottom:5px; margin-top:0;">ICEMA Post-ROSC Protocol</h4>
+            <h4 style="margin-bottom:5px; margin-top:0;">ROSC Checklist</h4>
             <div style="background: var(--input-bg); border: 1px solid var(--border-color); padding:10px; border-radius: 8px; margin-bottom: 10px;">
+                <!-- Each checklist item is now ACTION-LAUNCHING: if not yet done, tapping opens
+                     the relevant entry screen so the provider can complete it. Once done, the
+                     item auto-ticks via autoTickRoscChecklist() (called from logAction).
+                     ETCO2 and SBP auto-tick from existing data — tapping them re-opens the
+                     entry to record a fresh value if needed. -->
                 <button class="checklist-btn rosc-adult-only" id="chk-12lead" onclick="open12Lead()">12-Lead ECG <span></span></button>
-                <button class="checklist-btn" id="chk-vent" onclick="logROSCItem('chk-vent', 'Ventilating to ETCO2 35-45')">Ventilating to ETCO2 35-45 <span></span></button>
-                <button class="checklist-btn rosc-adult-only" id="chk-tube" onclick="logROSCItem('chk-tube', 'Patient Intubated')">Patient Intubated <span></span></button>
-                <button class="checklist-btn rosc-peds-only hidden" id="chk-airway" onclick="logROSCItem('chk-airway', 'Advanced Airway Placed')">Advanced Airway <span></span></button>
-                <button class="checklist-btn" id="chk-glucose" onclick="logROSCItem('chk-glucose', 'Checked Blood Glucose')">Check Blood Glucose <span></span></button>
-                <button class="checklist-btn" id="chk-sbp" onclick="logROSCItem('chk-sbp', 'Maintain SBP > Target')">Maintain SBP > <span id="sbp-target">90</span> <span class="ts-span"></span></button>
+                <button class="checklist-btn" id="chk-vent" onclick="openEtco2Slider()">Ventilating to ETCO2 35-45 <span></span></button>
+                <button class="checklist-btn rosc-adult-only" id="chk-tube" onclick="openIntubation()">Patient Intubated <span></span></button>
+                <button class="checklist-btn rosc-peds-only hidden" id="chk-airway" onclick="openIntubation()">Advanced Airway <span></span></button>
+                <button class="checklist-btn" id="chk-glucose" onclick="openValuePrompt('Glucose Value', 'Glucose', 'mg/dL')">Check Blood Glucose <span></span></button>
+                <button class="checklist-btn" id="chk-sbp" onclick="openRoscVitals()">Maintain SBP > <span id="sbp-target">90</span> <span class="ts-span"></span></button>
                 <button class="btn-small gold" id="btn-push-epi-rosc" style="width:100%; padding:10px; margin-top:5px;" onclick="logPushEpi()">+ Start Push Dose Epi Timer</button>
             </div>
 
@@ -1776,6 +1794,7 @@
         epiChimed: false,
         lidoActive: false,
         lidoTimer: null,
+        lidoChimed: false,      // Plays alarm chime once when lido timer hits 0, then lingers
         lidoDoses: 0,
         lidoTotalMg: 0,         // cumulative mg given — used for 3 mg/kg max check
         atropineDoses: 0,       // count of atropine doses given (max 3 for adult)
@@ -1786,6 +1805,8 @@
         pedsEpiDose: null, // stored mL dose
         pushEpiActive: false,
         pushEpiTimer: 0,
+        pushEpiChimed: false,   // Plays alarm chime once when push-epi timer hits 0, then lingers
+        everAchievedRosc: false,// Sticky flag — once true, blocks 20-min termination banner permanently
         fluidsRunning: false,
         fluidsStartTime: null,
         roscTimer: 0,
@@ -1903,7 +1924,11 @@
         // during compressions rather than only when another event fires renderLogs.
         if (state.totalTime % 10 === 0) updateMiniStats();
 
-        if (state.totalTime >= 1200 && state.currentPhase === 'ARREST') {
+        // 20-min termination banner — only shown during sustained arrest with no ROSC ever
+        // achieved. Once a ROSC has happened (even if patient re-arrests later), termination
+        // criteria don't apply — the brain has demonstrated reperfusion potential, so the
+        // resuscitation should continue regardless of clock time.
+        if (state.totalTime >= 1200 && state.currentPhase === 'ARREST' && !state.everAchievedRosc) {
             document.getElementById('banner-20min').classList.remove('hidden');
         }
         
@@ -1964,23 +1989,16 @@
                     state.epiChimed = true;
                 }
             }
-            
-            // ETCO2 timer — softer (yellow) alarm style, never auto-loops
-            if (state.cprHasStarted) {
-                state.etco2Timer -= delta;
-                renderTimerWithOverdue('clock-etco2', 'etco2-overdue', 'card-etco2', state.etco2Timer, 'etco2-alarm');
-                if (state.etco2Timer <= 0 && !state.etco2Chimed) {
-                    playChime();
-                    state.etco2Chimed = true;
-                }
-            }
 
+            // Lidocaine timer — fixed: lingers at 0 with alarm + overdue counter, then waits
+            // for the next dose to be given via the modal (same UX as Epi). Previously this
+            // auto-reset to 300 every time it hit zero, hiding the alarm and confusing providers.
             if (state.lidoActive && state.lidoTimer !== null) {
                 state.lidoTimer -= delta;
                 renderTimerWithOverdue('clock-lido', 'lido-overdue', 'card-lido', state.lidoTimer, 'flashing');
-                if (state.lidoTimer <= 0) {
+                if (state.lidoTimer <= 0 && !state.lidoChimed) {
                     playChime();
-                    state.lidoTimer = 300; // Continuous loop
+                    state.lidoChimed = true;
                 }
             }
         } else if (state.currentPhase === 'ROSC') {
@@ -1988,12 +2006,27 @@
             document.getElementById('clock-rosc').innerText = formatCountdown(state.roscTimer, true);
         }
 
+        // ETCO2 timer ticks in BOTH arrest AND ROSC phases — previously was inside the
+        // ARREST-only branch, which made the timer freeze during ROSC. ETCO2 monitoring
+        // is just as relevant post-ROSC for ventilation quality and re-arrest detection.
+        if (state.cprHasStarted) {
+            state.etco2Timer -= delta;
+            renderTimerWithOverdue('clock-etco2', 'etco2-overdue', 'card-etco2', state.etco2Timer, 'etco2-alarm');
+            if (state.etco2Timer <= 0 && !state.etco2Chimed) {
+                playChime();
+                state.etco2Chimed = true;
+            }
+        }
+
+        // Push-dose epi timer — fixed: lingers at 0 with alarm + overdue counter just like
+        // Epi/Lido. Previously auto-hid the card when timer hit 0, leading providers to think
+        // they had time when in fact the redose interval had passed. X button cancels.
         if (state.pushEpiActive) {
             state.pushEpiTimer -= delta;
-            updateCardDisplay('clock-push-epi', 'card-push-epi', state.pushEpiTimer);
-            if (state.pushEpiTimer <= 0) {
-                state.pushEpiActive = false;
-                document.getElementById('card-push-epi').classList.add('hidden');
+            renderTimerWithOverdue('clock-push-epi', 'push-epi-overdue', 'card-push-epi', state.pushEpiTimer, 'flashing');
+            if (state.pushEpiTimer <= 0 && !state.pushEpiChimed) {
+                playChime();
+                state.pushEpiChimed = true;
             }
         }
 
@@ -2028,13 +2061,16 @@
         appTime = state.startTime;
         state.isPediatric = (type === 'Pediatric');
         
-        document.getElementById('btn-start').classList.add('hidden');
+        // Swap from the pre-code "big START button" screen to the full dashboard
+        document.getElementById('pre-code-screen').style.display = 'none';
+        document.getElementById('main-dashboard').classList.remove('hidden');
         document.getElementById('btn-cpr').classList.remove('hidden');
         document.getElementById('arrest-timers').classList.remove('hidden');
         document.getElementById('action-panel').classList.remove('hidden');
         document.getElementById('btn-pt-info').classList.remove('hidden');
         document.getElementById('btn-end-code-top').classList.remove('hidden');
         document.getElementById('btn-transport').classList.remove('hidden');
+        document.getElementById('btn-undo').classList.remove('hidden');  // Now safe to expose Undo
         document.getElementById('btn-archive').classList.add('hidden'); // No accidental archive opens during a code
         
         if(state.isPediatric) {
@@ -2176,10 +2212,16 @@
     function ensureRhythmTimerStarted() {
         if (!state.cprHasStarted) {
             state.cprHasStarted = true;
-            // Remember the totalTime offset at which compressions first began.
+            // Remember the totalTime offset at which compressions FIRST began.
             // CCF is calculated against time elapsed SINCE this point (not since code start),
             // so any delay between patient-type selection and first START CPR doesn't tank it.
-            state.cprStartedAtTotalTime = state.totalTime;
+            //
+            // CRITICAL: only set this on the very first START CPR — NEVER on re-arrest CPR.
+            // If we reset this on every CPR resume, the priorRosc duration in calcCCF subtracts
+            // time we no longer have, producing nonsense percentages (e.g. 78,300%).
+            if (state.cprStartedAtTotalTime === 0) {
+                state.cprStartedAtTotalTime = state.totalTime;
+            }
             if (state.pulseTimer === null) {
                 state.pulseTimer = 120;
                 state.pulseChimed = false;
@@ -2337,7 +2379,8 @@
             if (state.firstDefibAtTotalTime != null) {
                 line(`Time to first defib: ${formatCountdown(state.firstDefibAtTotalTime, true)}`);
             }
-            if (state.defibPads?.placed) line(`Pads placed`);
+            // Note: pads-placed is intentionally NOT in handoff — the receiving team can see the
+            // pads on the patient visually, so verbalizing it just adds noise.
         }
 
         // === 5b. OTHER ELECTRICAL THERAPY (pacing, cardioversion) ===
@@ -2558,6 +2601,27 @@
                 tick('chk-vent', 'Ventilating to ETCO2 35-45');
             }
         }
+        // SBP at target (post-ROSC goal is >90 adult, >70+2×age peds — use 90 as common floor).
+        // We tick as long as any recorded SBP meets the target; the target is shown next to
+        // the item text so providers see what they're aiming for.
+        if (state.sbpHistory && state.sbpHistory.length) {
+            const lastSbp = state.sbpHistory[state.sbpHistory.length - 1];
+            if (lastSbp >= 90) {
+                tick('chk-sbp', `SBP at target (${lastSbp})`);
+            }
+        }
+    }
+
+    // Expand the ROSC vitals <details> and scroll it into view. Used by the ROSC checklist
+    // SBP item — tapping it opens the vitals entry so the provider can record a current SBP.
+    function openRoscVitals() {
+        const det = document.getElementById('rosc-vitals');
+        if (det) {
+            det.open = true;
+            det.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Focus the SBP field after the scroll animation so the keypad pops up
+            setTimeout(() => document.getElementById('vital-sbp')?.focus(), 350);
+        }
     }
 
     function logRhythm(rhythm) {
@@ -2580,6 +2644,9 @@
         if (rhythm === 'ROSC') {
             // Capture the CCF achieved at ROSC moment so the display freezes correctly
             state.ccfAtRosc = calcCCF() ?? 0;
+            // Sticky flag — blocks the 20-min termination banner from ever appearing again
+            // even if the patient re-arrests after this point. Reperfusion has been demonstrated.
+            state.everAchievedRosc = true;
             // Capture wall-clock time of this ROSC + push to history (supports multi-ROSC codes)
             const roscTime = getFormattedTime();
             state.roscAchievedAt = roscTime;
@@ -2634,12 +2701,18 @@
 
         state.pulseChimed = false;
         state.epiChimed = false;
+        state.lidoChimed = false;
+        state.pushEpiChimed = false;
         // ETCO2 cadence reverts to 2 min during re-arrest
         state.etco2Timer = 120;
         state.etco2Chimed = false;
         document.getElementById('card-etco2').classList.remove('etco2-alarm');
         document.getElementById('etco2-overdue').classList.add('hidden');
-        state.cprHasStarted = false; 
+        // NOTE: cprHasStarted is intentionally NOT reset here. CPR has started in this code,
+        // and resetting it would cause ensureRhythmTimerStarted to potentially re-anchor
+        // cprStartedAtTotalTime. We keep the original anchor so CCF math stays consistent
+        // across ROSC/re-arrest cycles. The earlier `state.cprHasStarted = false` was the bug.
+        // We leave cprActive (the button state) untouched so the provider must explicitly resume CPR.
         
         logAction(`--- RE-ARREST ${state.rearrests} ---`);
         
@@ -2649,6 +2722,10 @@
         document.getElementById('card-epi').classList.remove('hidden');
         if (state.lidoActive) document.getElementById('card-lido').classList.remove('hidden');
         document.getElementById('card-etco2').classList.remove('etco2-span');
+        // Push-dose epi is a post-ROSC therapy (for hypotension) — hide the card on re-arrest.
+        // Regular epinephrine resumes via the standard Epi timer.
+        state.pushEpiActive = false;
+        document.getElementById('card-push-epi').classList.add('hidden');
         document.getElementById('cpr-buttons-container').classList.remove('hidden');
         
         document.getElementById('btn-cpr').innerText = "START CPR";
@@ -2839,6 +2916,7 @@
         
         state.lidoActive = true;
         state.lidoTimer = 300;
+        state.lidoChimed = false; // arm the alarm for this new interval
         document.getElementById('card-lido').classList.remove('hidden');
         closeModal('modal-adult-lido');
         
@@ -2850,13 +2928,25 @@
 
     function cancelLido() {
         state.lidoActive = false;
+        state.lidoChimed = false; // reset for next activation
         document.getElementById('card-lido').classList.add('hidden');
         logAction("Lidocaine Timer Canceled");
+    }
+
+    // Cancel the push-dose-epi timer via the X button on the card (parallels cancelLido).
+    // Does NOT undo any doses already logged — only stops the countdown and hides the card.
+    function cancelPushEpi() {
+        state.pushEpiActive = false;
+        state.pushEpiChimed = false;
+        state.pushEpiTimer = 0;
+        document.getElementById('card-push-epi').classList.add('hidden');
+        logAction("Push Dose Epi Timer Canceled");
     }
 
     function logPushEpi() {
         state.pushEpiActive = true;
         state.pushEpiTimer = 60;
+        state.pushEpiChimed = false; // reset so the next interval can chime when it expires
         // For peds, also display & log the calculated mL dose (max 1 mL push-dose epi)
         let doseLabel = '';
         if (state.isPediatric && state.pediatricWeight) {
@@ -4202,11 +4292,14 @@
             }
         }
             
-            document.getElementById('btn-start').classList.add('hidden');
+            // Restoring an in-progress code: swap from the pre-code screen to the dashboard
+            document.getElementById('pre-code-screen').style.display = 'none';
+            document.getElementById('main-dashboard').classList.remove('hidden');
             document.getElementById('btn-cpr').classList.remove('hidden');
             document.getElementById('action-panel').classList.remove('hidden');
             document.getElementById('btn-pt-info').classList.remove('hidden');
             document.getElementById('btn-end-code-top').classList.remove('hidden');
+            document.getElementById('btn-undo').classList.remove('hidden');
             document.getElementById('btn-archive').classList.add('hidden');
             
             if (state.isPediatric) {
@@ -4252,7 +4345,7 @@
             
             if (state.currentPhase === 'ARREST') {
                 document.getElementById('arrest-timers').classList.remove('hidden');
-                if (state.totalTime >= 1200) document.getElementById('banner-20min').classList.remove('hidden');
+                if (state.totalTime >= 1200 && !state.everAchievedRosc) document.getElementById('banner-20min').classList.remove('hidden');
                 if (state.lidoActive) document.getElementById('card-lido').classList.remove('hidden');
                 if (state.pushEpiActive) document.getElementById('card-push-epi').classList.remove('hidden');
                 
@@ -4406,18 +4499,17 @@
                     return b;
                 };
 
-                actions.appendChild(mkBtn('Share', 'blue', () => shareReport(item.report)));
-                actions.appendChild(mkBtn('Text', '', () => smsReport(item.report)));
-                actions.appendChild(mkBtn('Email', '', () => emailReport(item.report)));
-                actions.appendChild(mkBtn('Copy', 'gold', () => copyReportToClipboard(item.report)));
-                actions.appendChild(mkBtn('View', '', () => {
-                    // Show full report inline using a simple alert-like pre dialog
+                // Simplified archive actions: just Summary, Handoff, and Delete. The
+                // Summary/Handoff subpages already include Share/Copy/Close, so duplicating
+                // them at the list level was redundant. Easier to scan + fewer mis-taps.
+                actions.appendChild(mkBtn('Summary', 'blue', () => {
+                    // Show the full saved code report in a read-only dialog
                     showFullReport(item.title, item.report);
                 }));
                 // Handoff is the verbal-report summary, saved separately so it can be
                 // copied or texted to the receiving hospital without all the timestamps.
                 if (item.handoff) {
-                    actions.appendChild(mkBtn('Handoff', 'gold', () => showFullReport(`${item.title} — HANDOFF`, item.handoff)));
+                    actions.appendChild(mkBtn('Handoff Report', 'gold', () => showFullReport(`${item.title} — HANDOFF`, item.handoff)));
                 }
                 actions.appendChild(mkBtn('Delete', 'danger', () => deleteArchiveIndex(idx)));
                 wrap.appendChild(actions);
@@ -4751,6 +4843,12 @@
         const dbp = document.getElementById('vital-dbp').value.trim();
         const hr = document.getElementById('vital-hr').value.trim();
         const spo2 = document.getElementById('vital-spo2').value.trim();
+        
+        // Track SBP history so the ROSC checklist can auto-tick when SBP meets target
+        if (sbp) {
+            if (!state.sbpHistory) state.sbpHistory = [];
+            state.sbpHistory.push(parseInt(sbp, 10));
+        }
         
         const parts = [];
         if (sbp && dbp) {
