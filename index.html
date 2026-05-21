@@ -38,9 +38,25 @@
         --radius: 12px;
     }
 
-    /* Automatic Dark Mode */
+    /* Dark theme palette — shared by manual override and system-auto */
+    :root[data-theme="dark"] {
+        --bg-color: #121212;
+        --card-bg: #1E1E1E;
+        --text-main: #E0E0E0;
+        --text-muted: #AAAAAA;
+        --primary-blue: #4A90E2;
+        --accent-gold: #E5C158;
+        --alert-red: #EF5350;
+        --gray-light: #333333;
+        --gray-dark: #666666;
+        --border-color: #444444;
+        --input-bg: #2C2C2C;
+    }
+
+    /* Automatic Dark Mode — only when user hasn't picked a theme explicitly.
+       :not([data-theme]) ensures manual Light selection wins over OS dark mode. */
     @media (prefers-color-scheme: dark) {
-        :root {
+        :root:not([data-theme]) {
             --bg-color: #121212;
             --card-bg: #1E1E1E;
             --text-main: #E0E0E0;
@@ -598,6 +614,175 @@
     /* Archive action button row */
     .archive-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .archive-actions .btn-small { flex: 1 1 auto; min-width: 70px; }
+
+    /* Settings gear button — floats top-right on the pre-code screen.
+       Sits inside #pre-code-screen so it disappears automatically once a code starts. */
+    .settings-gear {
+        position: absolute;
+        top: 12px;
+        right: max(12px, env(safe-area-inset-right));
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        color: var(--text-main);
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        font-size: 1.3em;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        transition: transform 0.15s;
+    }
+    .settings-gear:active { transform: scale(0.92) rotate(30deg); }
+
+    /* Theme picker — three side-by-side options */
+    .theme-options {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 18px;
+    }
+    .theme-option {
+        padding: 14px 8px;
+        border: 2px solid var(--border-color);
+        background: var(--input-bg);
+        color: var(--text-main);
+        border-radius: 10px;
+        font-weight: bold;
+        font-size: 0.95em;
+        cursor: pointer;
+        text-align: center;
+        line-height: 1.3;
+        min-height: 60px;
+        transition: 0.1s;
+    }
+    .theme-option .theme-icon { font-size: 1.4em; display: block; margin-bottom: 2px; }
+    .theme-option:active { transform: scale(0.97); }
+    .theme-option.active {
+        border-color: var(--primary-blue);
+        background: var(--primary-blue);
+        color: #FFF;
+    }
+
+    /* Med settings group */
+    .med-settings-group {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 14px;
+        background: var(--input-bg);
+    }
+    .med-settings-group h4 {
+        margin: 0 0 12px 0;
+        color: var(--primary-blue);
+        font-size: 1em;
+    }
+    /* Accordion version for many-drug list */
+    details.med-accordion {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        background: var(--input-bg);
+        overflow: hidden;
+    }
+    details.med-accordion > summary {
+        padding: 12px 14px;
+        cursor: pointer;
+        font-weight: bold;
+        color: var(--primary-blue);
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        user-select: none;
+        -webkit-user-select: none;
+        font-size: 0.98em;
+    }
+    details.med-accordion > summary::-webkit-details-marker { display: none; }
+    details.med-accordion > summary::after {
+        content: '▸';
+        font-size: 0.85em;
+        color: var(--text-muted);
+        transition: transform 0.15s;
+    }
+    details.med-accordion[open] > summary::after {
+        transform: rotate(90deg);
+    }
+    details.med-accordion > summary .med-summary-hint {
+        font-weight: normal;
+        color: var(--text-muted);
+        font-size: 0.82em;
+        margin-left: 8px;
+        flex: 1;
+        text-align: right;
+        padding-right: 10px;
+    }
+    details.med-accordion > .med-accordion-body {
+        padding: 0 14px 14px 14px;
+        border-top: 1px solid var(--border-color);
+        padding-top: 12px;
+    }
+    .med-settings-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    .med-settings-row:last-child { margin-bottom: 0; }
+    .med-settings-row label {
+        font-size: 0.9em;
+        color: var(--text-main);
+        flex: 1;
+        line-height: 1.3;
+    }
+    .med-settings-row label small {
+        display: block;
+        color: var(--text-muted);
+        font-weight: normal;
+        font-size: 0.85em;
+        margin-top: 2px;
+    }
+    .med-settings-row input {
+        width: 90px;
+        padding: 8px;
+        border: 2px solid var(--border-color);
+        border-radius: 6px;
+        font-size: 1em;
+        text-align: right;
+        background: var(--card-bg);
+        color: var(--text-main);
+        font-weight: bold;
+        font-variant-numeric: tabular-nums;
+    }
+    .med-settings-row .unit {
+        color: var(--text-muted);
+        font-size: 0.85em;
+        min-width: 40px;
+    }
+
+    /* Intubation attempt counter banner */
+    .intub-attempt-banner {
+        background: var(--primary-blue);
+        color: #FFF;
+        padding: 8px 12px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: bold;
+        margin-bottom: 12px;
+        font-size: 0.95em;
+        font-variant-numeric: tabular-nums;
+    }
+    .intub-attempt-banner.over-limit {
+        background: var(--alert-red);
+        animation: attempt-pulse 1s infinite;
+    }
+    @keyframes attempt-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(211,47,47,0.6); }
+        50% { box-shadow: 0 0 0 8px rgba(211,47,47,0); }
+    }
 </style>
 </head>
 <body>
@@ -615,8 +800,10 @@
 </div>
 
 <!-- Pre-code start screen — shown before code start. Just a title and a big START button.
-     No clock, no timers, no Undo. Once START is tapped, this hides and #main-dashboard takes over. -->
-<div id="pre-code-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; padding: 20px;">
+     No clock, no timers, no Undo. Once START is tapped, this hides and #main-dashboard takes over.
+     position:relative so the absolutely-positioned settings gear can anchor to it. -->
+<div id="pre-code-screen" style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; padding: 20px;">
+    <button class="settings-gear" id="btn-settings" onclick="openSettings()" aria-label="Settings" title="Settings">⚙️</button>
     <div style="text-align: center; margin-bottom: 30px;">
         <div style="font-size: 4em; margin-bottom: 8px;">🫀</div>
         <h2 style="margin: 0; color: var(--primary-blue);">Code Scribe / Timekeeper</h2>
@@ -1203,6 +1390,7 @@
 <div id="modal-intubation" class="modal-overlay">
     <div class="modal" id="intub-modal-content">
         <h2>Advanced Airway Attempt</h2>
+        <div class="intub-attempt-banner" id="intub-attempt-banner">Attempt #1</div>
         <div style="background:var(--gray-light); padding:10px; border-radius:8px; text-align:center; margin-bottom:15px;">
             <div style="font-size:0.9em; color:var(--text-main); font-weight:bold;">ATTEMPT DURATION (AHA Target < 30s)</div>
             <div id="intub-timer-display" style="font-size:2.5em; font-weight:bold; font-variant-numeric:tabular-nums; color:var(--text-main);">00:00</div>
@@ -1726,6 +1914,159 @@
     </div>
 </div>
 
+<!-- Settings Modal — accessible only from the pre-code screen.
+     Persists theme + medication-defaults overrides in localStorage so they survive reloads.
+     Medications use collapsible <details> accordions so the modal stays scannable. -->
+<div id="modal-settings" class="modal-overlay">
+    <div class="modal">
+        <h2 style="margin-top:0;">⚙️ Settings</h2>
+
+        <h3 style="margin-top:4px; border-bottom:1px solid var(--border-color); padding-bottom:6px;">Appearance</h3>
+        <div class="theme-options" role="radiogroup" aria-label="Theme">
+            <button class="theme-option" id="theme-opt-light" onclick="setThemePreference('light')" role="radio">
+                <span class="theme-icon">☀️</span>Light
+            </button>
+            <button class="theme-option" id="theme-opt-dark" onclick="setThemePreference('dark')" role="radio">
+                <span class="theme-icon">🌙</span>Dark
+            </button>
+            <button class="theme-option" id="theme-opt-auto" onclick="setThemePreference('auto')" role="radio">
+                <span class="theme-icon">⚙️</span>Auto
+            </button>
+        </div>
+
+        <h3 style="border-bottom:1px solid var(--border-color); padding-bottom:6px;">Medication Defaults</h3>
+        <p style="color:var(--text-muted); font-size:0.85em; margin-top:0;">
+            Tap a drug to expand and edit. Values feed dose prompts, the pediatric cheat card, and timer-triggered calculations. Concentrations are mg/mL of the carry preparation. Defaults reflect current AHA/ACLS/PALS standards; edit to match your local protocol.
+        </p>
+
+        <details class="med-accordion">
+            <summary>Epinephrine 1:10,000 <span class="med-summary-hint">cardiac arrest</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>Standard 1 mg q3–5 min</small></label><input type="number" id="cfg-epi-adult" step="0.1" min="0.1"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds per kg<small>PALS 0.01 mg/kg</small></label><input type="number" id="cfg-epi-peds-per-kg" step="0.001" min="0.001"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds max single<small>Cap on calculated dose</small></label><input type="number" id="cfg-epi-peds-max" step="0.1" min="0.1"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>1:10,000 = 0.1 mg/mL</small></label><input type="number" id="cfg-epi-conc" step="0.01" min="0.001"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Lidocaine <span class="med-summary-hint">VF/pVT</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult 1st per kg<small>Loading 1–1.5 mg/kg</small></label><input type="number" id="cfg-lido-adult-1" step="0.1" min="0.1"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Adult subsequent per kg<small>0.5–0.75 mg/kg</small></label><input type="number" id="cfg-lido-adult-2" step="0.05" min="0.05"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds 1st per kg<small>PALS 1 mg/kg</small></label><input type="number" id="cfg-lido-peds-1" step="0.1" min="0.1"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds subsequent per kg<small>0.5 mg/kg</small></label><input type="number" id="cfg-lido-peds-2" step="0.05" min="0.05"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Cumulative max per kg<small>Hard cap (toxicity)</small></label><input type="number" id="cfg-lido-max" step="0.1" min="0.5"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>Typical 20 mg/mL</small></label><input type="number" id="cfg-lido-conc" step="1" min="1"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Atropine <span class="med-summary-hint">bradycardia</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>1 mg q3–5 min</small></label><input type="number" id="cfg-atro-adult" step="0.1" min="0.1"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Adult max total<small>Cumulative cap</small></label><input type="number" id="cfg-atro-adult-max" step="0.5" min="0.5"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds per kg<small>PALS 0.02 mg/kg</small></label><input type="number" id="cfg-atro-peds-per-kg" step="0.005" min="0.005"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds min single<small>Floor below which dose ineffective</small></label><input type="number" id="cfg-atro-peds-min" step="0.05" min="0.05"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds max single<small>Ceiling per dose</small></label><input type="number" id="cfg-atro-peds-max" step="0.1" min="0.1"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>Pre-filled 1 mg / 10 mL</small></label><input type="number" id="cfg-atro-conc" step="0.01" min="0.01"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Adenosine <span class="med-summary-hint">SVT</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult 1st dose<small>Rapid IV push + flush</small></label><input type="number" id="cfg-aden-adult-1" step="0.5" min="0.5"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Adult subsequent<small>If 1st fails</small></label><input type="number" id="cfg-aden-adult-2" step="0.5" min="0.5"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds 1st per kg<small>0.1 mg/kg</small></label><input type="number" id="cfg-aden-peds-1-per-kg" step="0.01" min="0.01"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds 1st max<small>Cap on 1st dose</small></label><input type="number" id="cfg-aden-peds-1-max" step="0.5" min="0.5"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds subsequent per kg<small>0.2 mg/kg</small></label><input type="number" id="cfg-aden-peds-2-per-kg" step="0.01" min="0.01"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds subsequent max<small>Cap on subsequent</small></label><input type="number" id="cfg-aden-peds-2-max" step="0.5" min="0.5"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>6 mg / 2 mL = 3 mg/mL</small></label><input type="number" id="cfg-aden-conc" step="0.1" min="0.1"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Sodium Bicarbonate <span class="med-summary-hint">acidosis · hyperK</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>1 amp = 50 mEq</small></label><input type="number" id="cfg-bicarb-adult" step="5" min="5"><span class="unit">mEq</span></div>
+                <div class="med-settings-row"><label>Peds per kg<small>1 mEq/kg</small></label><input type="number" id="cfg-bicarb-peds-per-kg" step="0.1" min="0.1"><span class="unit">mEq/kg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>50 mEq / 50 mL = 1 mEq/mL</small></label><input type="number" id="cfg-bicarb-conc" step="0.1" min="0.1"><span class="unit">mEq/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Calcium Chloride <span class="med-summary-hint">hyperK · CCB OD</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>1 g = 1000 mg</small></label><input type="number" id="cfg-cal-adult" step="100" min="100"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds per kg<small>20 mg/kg</small></label><input type="number" id="cfg-cal-peds-per-kg" step="1" min="1"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>1 g / 10 mL = 100 mg/mL</small></label><input type="number" id="cfg-cal-conc" step="10" min="10"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Magnesium Sulfate <span class="med-summary-hint">torsades</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>2 g IV slow push</small></label><input type="number" id="cfg-mag-adult" step="500" min="500"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds per kg<small>50 mg/kg</small></label><input type="number" id="cfg-mag-peds-per-kg" step="5" min="5"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds max<small>Cap on calculated dose</small></label><input type="number" id="cfg-mag-peds-max" step="100" min="100"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>5 g / 10 mL = 500 mg/mL</small></label><input type="number" id="cfg-mag-conc" step="50" min="50"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Dextrose <span class="med-summary-hint">hypoglycemia</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>25 g (D50 50 mL or D10 250 mL)</small></label><input type="number" id="cfg-d-adult" step="5" min="5"><span class="unit">g</span></div>
+                <div class="med-settings-row"><label>Peds mL/kg of D10<small>5 mL/kg PALS</small></label><input type="number" id="cfg-d-peds-per-kg" step="0.5" min="0.5"><span class="unit">mL/kg</span></div>
+                <div class="med-settings-row"><label>Peds max mL<small>Cap on calculated mL</small></label><input type="number" id="cfg-d-peds-max" step="10" min="10"><span class="unit">mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Naloxone (Narcan) <span class="med-summary-hint">opioid OD</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>Low-dose titration preferred IV</small></label><input type="number" id="cfg-narcan-adult" step="0.1" min="0.1"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds per kg<small>0.1 mg/kg PALS</small></label><input type="number" id="cfg-narcan-peds-per-kg" step="0.01" min="0.01"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds max single<small>Cap on calculated dose</small></label><input type="number" id="cfg-narcan-peds-max" step="0.1" min="0.1"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>2 mg / 2 mL = 1.0 mg/mL</small></label><input type="number" id="cfg-narcan-conc" step="0.1" min="0.1"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Push-Dose Epinephrine <span class="med-summary-hint">post-ROSC hypotension</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Peds mL/kg<small>0.1 mL/kg of 10 mcg/mL</small></label><input type="number" id="cfg-pepi-peds-per-kg" step="0.01" min="0.01"><span class="unit">mL/kg</span></div>
+                <div class="med-settings-row"><label>Peds max mL<small>Cap on push dose</small></label><input type="number" id="cfg-pepi-peds-max" step="0.1" min="0.1"><span class="unit">mL</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>Defibrillation Energy <span class="med-summary-hint">VF/pVT</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult default<small>Biphasic per device, typically 200 J</small></label><input type="number" id="cfg-defib-adult" step="10" min="50"><span class="unit">J</span></div>
+                <div class="med-settings-row"><label>Peds 1st shock<small>PALS 2 J/kg</small></label><input type="number" id="cfg-defib-peds-1" step="0.5" min="0.5"><span class="unit">J/kg</span></div>
+                <div class="med-settings-row"><label>Peds 2nd shock<small>PALS 4 J/kg</small></label><input type="number" id="cfg-defib-peds-2" step="0.5" min="0.5"><span class="unit">J/kg</span></div>
+                <div class="med-settings-row"><label>Peds 3rd+ shock<small>PALS 4–10 J/kg, default 6</small></label><input type="number" id="cfg-defib-peds-3" step="0.5" min="0.5"><span class="unit">J/kg</span></div>
+                <div class="med-settings-row"><label>Peds max J<small>Don't exceed adult max</small></label><input type="number" id="cfg-defib-peds-max" step="10" min="50"><span class="unit">J</span></div>
+            </div>
+        </details>
+
+        <details class="med-accordion">
+            <summary>IV Fluids <span class="med-summary-hint">peds bolus</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Peds bolus mL/kg<small>20 mL/kg PALS</small></label><input type="number" id="cfg-fluid-peds-per-kg" step="5" min="5"><span class="unit">mL/kg</span></div>
+            </div>
+        </details>
+
+        <div class="btn-grid" style="margin-top:16px;">
+            <button class="btn-large btn-gold" onclick="saveSettings()">Save</button>
+            <button class="btn-large btn-gray" onclick="closeModal('modal-settings')">Cancel</button>
+        </div>
+        <button class="btn-large btn-full btn-red" onclick="resetMedConfig()" style="margin-top:10px;">Reset All Medications to Defaults</button>
+    </div>
+</div>
+
 <!-- Toast notification (transient feedback) -->
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
@@ -1762,6 +2103,292 @@
 
     function playChime() {
         playBeep(700, 'sine', 0.3, 0.1);
+    }
+
+    // --- Settings: Theme + Medication Defaults ---
+    // These persist via localStorage and are loaded on window.onload before anything else
+    // touches the DOM, so the chosen theme is applied without a flash of the wrong palette.
+
+    // DEFAULT_MED_CONFIG holds factory values. medConfig is the live working copy that
+    // dose calculations read from. Anything the user changes in Settings is saved into
+    // 'medConfig' in localStorage and merged back into medConfig at load time.
+    //
+    // Concentrations reflect the most common EMS carry preparations. Dose recommendations
+    // come from current AHA/ACLS/PALS standards but vary by local protocol — every value
+    // is editable so agencies can tune to match their formulary and standing orders.
+    const DEFAULT_MED_CONFIG = Object.freeze({
+        epi: {                              // Epinephrine 1:10,000 — cardiac arrest
+            adultDoseMg: 1,
+            pedsPerKg: 0.01,
+            pedsMaxMg: 1,
+            concMgPerMl: 0.1                // 1:10,000 = 0.1 mg/mL
+        },
+        lidocaine: {                        // Antiarrhythmic — VF/pVT
+            adultFirstPerKg: 1.5,           // 1–1.5 mg/kg first dose
+            adultSubsequentPerKg: 0.75,     // 0.5–0.75 mg/kg subsequent
+            pedsFirstPerKg: 1.0,            // PALS: 1 mg/kg
+            pedsSubsequentPerKg: 0.5,
+            cumulativeMaxPerKg: 3,          // Cap at 3 mg/kg total
+            concMgPerMl: 20                 // 100 mg / 5 mL or 200 mg / 10 mL
+        },
+        atropine: {                         // Symptomatic bradycardia
+            adultDoseMg: 1,
+            adultMaxTotalMg: 3,
+            pedsPerKg: 0.02,
+            pedsMinMg: 0.1,                 // PALS minimum single dose
+            pedsMaxMg: 0.5,                 // PALS maximum single dose
+            concMgPerMl: 0.1                // 1 mg / 10 mL pre-filled syringe
+        },
+        adenosine: {                        // SVT
+            adultFirstMg: 6,
+            adultSubsequentMg: 12,
+            pedsFirstPerKg: 0.1,
+            pedsFirstMaxMg: 6,
+            pedsSubsequentPerKg: 0.2,
+            pedsSubsequentMaxMg: 12,
+            concMgPerMl: 3                  // 6 mg / 2 mL vial
+        },
+        bicarbonate: {                      // Acidosis / hyperK / tricyclic OD
+            adultDoseMEq: 50,
+            pedsPerKg: 1,
+            concMEqPerMl: 1                 // 50 mEq / 50 mL
+        },
+        calcium: {                          // Calcium Chloride — hyperK, CCB OD
+            adultDoseMg: 1000,
+            pedsPerKg: 20,
+            concMgPerMl: 100                // 1 g / 10 mL
+        },
+        magnesium: {                        // Torsades / refractory VF
+            adultDoseMg: 2000,              // 2 g IV
+            pedsPerKg: 50,                  // 50 mg/kg
+            pedsMaxMg: 2000,
+            concMgPerMl: 500                // 5 g / 10 mL
+        },
+        dextrose: {                         // Hypoglycemia
+            adultDoseG: 25,                 // 25 g (D50 50 mL or D10 250 mL)
+            pedsMlPerKg: 5,                 // D10 5 mL/kg
+            pedsMaxMl: 250
+        },
+        narcan: {                           // Naloxone — opioid OD
+            adultDoseMg: 0.5,
+            pedsPerKg: 0.1,
+            pedsMaxMg: 0.5,
+            concMgPerMl: 1.0                // Modern 2 mg / 2 mL ampule
+        },
+        pushEpi: {                          // Push-dose epinephrine — post-ROSC hypotension
+            pedsMlPerKg: 0.1,
+            pedsMaxMl: 1
+        },
+        defib: {                            // Defibrillation energy (Joules)
+            adultDefaultJ: 200,
+            pedsFirstJperKg: 2,
+            pedsSecondJperKg: 4,
+            pedsThirdPlusJperKg: 6,         // Escalate to 10 J/kg per PALS; 6 is starting point
+            pedsMaxJ: 200
+        },
+        fluids: {                           // IV fluid bolus
+            pedsBolusMlPerKg: 20            // 20 mL/kg PALS bolus
+        }
+    });
+
+    // Live config — starts as a deep copy of defaults; loadMedConfig() merges saved overrides.
+    let medConfig = JSON.parse(JSON.stringify(DEFAULT_MED_CONFIG));
+
+    function loadMedConfig() {
+        try {
+            const raw = localStorage.getItem('medConfig');
+            if (!raw) return;
+            const saved = JSON.parse(raw);
+            // Shallow-merge per-drug so a future field added to defaults still works
+            // when the user's saved blob predates that field.
+            Object.keys(DEFAULT_MED_CONFIG).forEach(drug => {
+                if (saved[drug] && typeof saved[drug] === 'object') {
+                    medConfig[drug] = { ...DEFAULT_MED_CONFIG[drug], ...saved[drug] };
+                }
+            });
+        } catch (e) {
+            console.warn('loadMedConfig failed; using defaults', e);
+        }
+    }
+
+    function resetMedConfig() {
+        if (!confirm('Reset medication defaults to factory values? This will not affect the current code if one is running.')) return;
+        medConfig = JSON.parse(JSON.stringify(DEFAULT_MED_CONFIG));
+        try { localStorage.removeItem('medConfig'); } catch (_) {}
+        renderMedSettings(); // refresh the form fields
+        showToast('Medication defaults reset');
+    }
+
+    // Theme management — preference is stored as 'light' | 'dark' | 'auto'.
+    // 'auto' means: clear the data-theme attribute and let prefers-color-scheme decide.
+    function applyTheme(theme) {
+        const root = document.documentElement;
+        if (theme === 'light' || theme === 'dark') {
+            root.setAttribute('data-theme', theme);
+        } else {
+            root.removeAttribute('data-theme');
+        }
+        // Update <meta name="theme-color"> so iOS status bar / Android chrome match.
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) {
+            const isDarkRendered = theme === 'dark'
+                || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            meta.setAttribute('content', isDarkRendered ? '#121212' : '#0A3663');
+        }
+    }
+
+    function loadThemePreference() {
+        let theme = 'auto';
+        try {
+            theme = localStorage.getItem('themePref') || 'auto';
+        } catch (_) {}
+        if (!['light', 'dark', 'auto'].includes(theme)) theme = 'auto';
+        applyTheme(theme);
+        return theme;
+    }
+
+    function setThemePreference(theme) {
+        if (!['light', 'dark', 'auto'].includes(theme)) return;
+        try { localStorage.setItem('themePref', theme); } catch (_) {}
+        applyTheme(theme);
+        // Highlight the chosen option button
+        ['light', 'dark', 'auto'].forEach(t => {
+            const btn = document.getElementById(`theme-opt-${t}`);
+            if (btn) btn.classList.toggle('active', t === theme);
+        });
+    }
+
+    function openSettings() {
+        // Reflect current theme in the picker
+        let cur = 'auto';
+        try { cur = localStorage.getItem('themePref') || 'auto'; } catch (_) {}
+        ['light', 'dark', 'auto'].forEach(t => {
+            const btn = document.getElementById(`theme-opt-${t}`);
+            if (btn) btn.classList.toggle('active', t === cur);
+        });
+        renderMedSettings();
+        openModal('modal-settings');
+    }
+
+    // CONFIG_FIELD_MAP — single source of truth for which DOM input maps to which medConfig path.
+    // Drives both rendering (medConfig → input) and saving (input → medConfig). Adding a new
+    // configurable field only requires appending one entry here plus the corresponding <input>.
+    const CONFIG_FIELD_MAP = [
+        // Epinephrine
+        ['cfg-epi-adult',           'epi.adultDoseMg'],
+        ['cfg-epi-peds-per-kg',     'epi.pedsPerKg'],
+        ['cfg-epi-peds-max',        'epi.pedsMaxMg'],
+        ['cfg-epi-conc',            'epi.concMgPerMl'],
+        // Lidocaine
+        ['cfg-lido-adult-1',        'lidocaine.adultFirstPerKg'],
+        ['cfg-lido-adult-2',        'lidocaine.adultSubsequentPerKg'],
+        ['cfg-lido-peds-1',         'lidocaine.pedsFirstPerKg'],
+        ['cfg-lido-peds-2',         'lidocaine.pedsSubsequentPerKg'],
+        ['cfg-lido-max',            'lidocaine.cumulativeMaxPerKg'],
+        ['cfg-lido-conc',           'lidocaine.concMgPerMl'],
+        // Atropine
+        ['cfg-atro-adult',          'atropine.adultDoseMg'],
+        ['cfg-atro-adult-max',      'atropine.adultMaxTotalMg'],
+        ['cfg-atro-peds-per-kg',    'atropine.pedsPerKg'],
+        ['cfg-atro-peds-min',       'atropine.pedsMinMg'],
+        ['cfg-atro-peds-max',       'atropine.pedsMaxMg'],
+        ['cfg-atro-conc',           'atropine.concMgPerMl'],
+        // Adenosine
+        ['cfg-aden-adult-1',        'adenosine.adultFirstMg'],
+        ['cfg-aden-adult-2',        'adenosine.adultSubsequentMg'],
+        ['cfg-aden-peds-1-per-kg',  'adenosine.pedsFirstPerKg'],
+        ['cfg-aden-peds-1-max',     'adenosine.pedsFirstMaxMg'],
+        ['cfg-aden-peds-2-per-kg',  'adenosine.pedsSubsequentPerKg'],
+        ['cfg-aden-peds-2-max',     'adenosine.pedsSubsequentMaxMg'],
+        ['cfg-aden-conc',           'adenosine.concMgPerMl'],
+        // Bicarbonate
+        ['cfg-bicarb-adult',        'bicarbonate.adultDoseMEq'],
+        ['cfg-bicarb-peds-per-kg',  'bicarbonate.pedsPerKg'],
+        ['cfg-bicarb-conc',         'bicarbonate.concMEqPerMl'],
+        // Calcium
+        ['cfg-cal-adult',           'calcium.adultDoseMg'],
+        ['cfg-cal-peds-per-kg',     'calcium.pedsPerKg'],
+        ['cfg-cal-conc',            'calcium.concMgPerMl'],
+        // Magnesium
+        ['cfg-mag-adult',           'magnesium.adultDoseMg'],
+        ['cfg-mag-peds-per-kg',     'magnesium.pedsPerKg'],
+        ['cfg-mag-peds-max',        'magnesium.pedsMaxMg'],
+        ['cfg-mag-conc',            'magnesium.concMgPerMl'],
+        // Dextrose
+        ['cfg-d-adult',             'dextrose.adultDoseG'],
+        ['cfg-d-peds-per-kg',       'dextrose.pedsMlPerKg'],
+        ['cfg-d-peds-max',          'dextrose.pedsMaxMl'],
+        // Narcan
+        ['cfg-narcan-adult',        'narcan.adultDoseMg'],
+        ['cfg-narcan-peds-per-kg',  'narcan.pedsPerKg'],
+        ['cfg-narcan-peds-max',     'narcan.pedsMaxMg'],
+        ['cfg-narcan-conc',         'narcan.concMgPerMl'],
+        // Push-Dose Epi
+        ['cfg-pepi-peds-per-kg',    'pushEpi.pedsMlPerKg'],
+        ['cfg-pepi-peds-max',       'pushEpi.pedsMaxMl'],
+        // Defib
+        ['cfg-defib-adult',         'defib.adultDefaultJ'],
+        ['cfg-defib-peds-1',        'defib.pedsFirstJperKg'],
+        ['cfg-defib-peds-2',        'defib.pedsSecondJperKg'],
+        ['cfg-defib-peds-3',        'defib.pedsThirdPlusJperKg'],
+        ['cfg-defib-peds-max',      'defib.pedsMaxJ'],
+        // Fluids
+        ['cfg-fluid-peds-per-kg',   'fluids.pedsBolusMlPerKg']
+    ];
+
+    // Helper to traverse a dotted path like "epi.adultDoseMg" on a config object.
+    function getConfigValue(cfg, path) {
+        return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), cfg);
+    }
+    function setConfigValue(cfg, path, val) {
+        const keys = path.split('.');
+        const last = keys.pop();
+        const target = keys.reduce((o, k) => (o[k] = o[k] || {}), cfg);
+        target[last] = val;
+    }
+
+    function renderMedSettings() {
+        // Populate every input field from the current live config.
+        CONFIG_FIELD_MAP.forEach(([id, path]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = getConfigValue(medConfig, path);
+        });
+    }
+
+    function saveSettings() {
+        // Read every input. Anything non-numeric or ≤0 is rejected as a whole — saving partial
+        // garbage into a dose calculator would be worse than not saving at all.
+        const newConfig = JSON.parse(JSON.stringify(medConfig));
+        const errors = [];
+        CONFIG_FIELD_MAP.forEach(([id, path]) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const v = parseFloat(el.value);
+            if (!isFinite(v) || v <= 0) {
+                errors.push(path);
+                return;
+            }
+            setConfigValue(newConfig, path, v);
+        });
+        if (errors.length) {
+            showToast(`Invalid values: ${errors.length} field(s) need positive numbers`);
+            return;
+        }
+        medConfig = newConfig;
+        try {
+            localStorage.setItem('medConfig', JSON.stringify(medConfig));
+        } catch (e) {
+            console.warn('saveSettings failed:', e);
+            showToast('Could not save (storage full?)');
+            return;
+        }
+        // If a peds code is already running and weight is set, refresh the cheat-card doses
+        // so the new concentrations/per-kg values appear immediately without restarting the code.
+        if (state.isActive && state.isPediatric && state.pediatricWeight) {
+            setPedWeight(state.pediatricWeight);
+        }
+        closeModal('modal-settings');
+        showToast('Settings saved');
     }
 
     // --- System Variables ---
@@ -1850,7 +2477,10 @@
         currentVascularType: null,
         isDoeActive: false,
         isPediatric: false,
-        pediatricWeight: null
+        pediatricWeight: null,
+        intubAttempts: 0        // Number of advanced-airway attempts logged this code (success+fail).
+                                 // >3 displays a red pulsing banner cueing the team to reconsider approach
+                                 // (switch device, change provider, abandon for BVM/i-gel).
     };
 
     const htItems = [
@@ -1869,6 +2499,9 @@
 
     // --- Initialization ---
     window.onload = async () => {
+        // Apply user preferences FIRST so the UI never flashes the wrong theme.
+        loadThemePreference();
+        loadMedConfig();
         buildHTList();
         loadState();
         requestWakeLock();
@@ -2146,48 +2779,73 @@
             logAction(`Pediatric weight: ${w} kg (${lbs} lbs, Broselow)`);
         }
         
-        // PALS dose math with regional carry concentrations:
-        // - Epi 1:10,000 = 0.1 mg/mL
-        // - Lido 20 mg/mL
-        // - Bicarb 50 mEq / 50 mL  (1 mEq/mL)
-        // - Calcium Chloride 1 g / 10 mL  (100 mg/mL)
-        // - Magnesium 5 g / 10 mL  (500 mg/mL)
-        // - Narcan 0.4 mg/mL
+        // PALS dose math driven by medConfig — every constant below is editable from
+        // Settings. Concentrations reflect the carry preparation in mg/mL (or mEq/mL for bicarb).
+        const cE   = medConfig.epi;
+        const cL   = medConfig.lidocaine;
+        const cBi  = medConfig.bicarbonate;
+        const cCa  = medConfig.calcium;
+        const cMg  = medConfig.magnesium;
+        const cD   = medConfig.dextrose;
+        const cN   = medConfig.narcan;
+        const cPe  = medConfig.pushEpi;
+        const cDf  = medConfig.defib;
+        const cFl  = medConfig.fluids;
         
-        const epiMg = parseFloat((w * 0.01).toFixed(2));
-        const epiMl = parseFloat(Math.min(w * 0.1, 10).toFixed(1));
-        const lido1Mg = parseFloat((w * 1.0).toFixed(1));
-        const lido1Ml = parseFloat((lido1Mg / 20).toFixed(2));
-        const lido2Mg = parseFloat((w * 0.5).toFixed(1));
-        const lido2Ml = parseFloat((lido2Mg / 20).toFixed(2));
-        const fluids = parseFloat((w * 20).toFixed(0));
-        const d10Ml = parseFloat(Math.min(w * 5, 250).toFixed(0));
-        const narcanMg = parseFloat(Math.min(w * 0.1, 2.0).toFixed(2));
-        const narcanMl = parseFloat((narcanMg / 0.4).toFixed(2));
-        const pEpiMl = parseFloat(Math.min(w * 0.1, 1.0).toFixed(2));
-        const bicarbMeq = parseFloat((w * 1.0).toFixed(1));
-        const bicarbMl = parseFloat(bicarbMeq.toFixed(1));         // 1 mEq/mL → mL = mEq
-        const calMg = parseFloat((w * 20).toFixed(0));
-        const calMl = parseFloat((calMg / 100).toFixed(1));        // 100 mg/mL
-        const magMg = parseFloat(Math.min(w * 50, 2000).toFixed(0));
-        const magMl = parseFloat((magMg / 500).toFixed(2));        // 500 mg/mL
+        const epiMg = parseFloat(Math.min(w * cE.pedsPerKg, cE.pedsMaxMg).toFixed(2));
+        const epiMl = parseFloat((epiMg / cE.concMgPerMl).toFixed(1));
+        const lido1Mg = parseFloat((w * cL.pedsFirstPerKg).toFixed(1));
+        const lido1Ml = parseFloat((lido1Mg / cL.concMgPerMl).toFixed(2));
+        const lido2Mg = parseFloat((w * cL.pedsSubsequentPerKg).toFixed(1));
+        const lido2Ml = parseFloat((lido2Mg / cL.concMgPerMl).toFixed(2));
+        const fluids = parseFloat((w * cFl.pedsBolusMlPerKg).toFixed(0));
+        const d10Ml = parseFloat(Math.min(w * cD.pedsMlPerKg, cD.pedsMaxMl).toFixed(0));
+        const narcanMg = parseFloat(Math.min(w * cN.pedsPerKg, cN.pedsMaxMg).toFixed(2));
+        const narcanMl = parseFloat((narcanMg / cN.concMgPerMl).toFixed(2));
+        const pEpiMl = parseFloat(Math.min(w * cPe.pedsMlPerKg, cPe.pedsMaxMl).toFixed(2));
+        const bicarbMeq = parseFloat((w * cBi.pedsPerKg).toFixed(1));
+        const bicarbMl = parseFloat((bicarbMeq / cBi.concMEqPerMl).toFixed(1));
+        const calMg = parseFloat((w * cCa.pedsPerKg).toFixed(0));
+        const calMl = parseFloat((calMg / cCa.concMgPerMl).toFixed(1));
+        const magMg = parseFloat(Math.min(w * cMg.pedsPerKg, cMg.pedsMaxMg).toFixed(0));
+        const magMl = parseFloat((magMg / cMg.concMgPerMl).toFixed(2));
         
+        // Defib values use configurable J/kg steps with a J ceiling. The 3rd+ shock label
+        // spans the PALS range (3rd-J to 10 J/kg per AHA) but defaults to the configured value.
+        const defib1 = Math.min(w * cDf.pedsFirstJperKg, cDf.pedsMaxJ);
+        const defib2 = Math.min(w * cDf.pedsSecondJperKg, cDf.pedsMaxJ);
+        const defib3 = Math.min(w * cDf.pedsThirdPlusJperKg, cDf.pedsMaxJ);
+        const defib10 = Math.min(w * 10, cDf.pedsMaxJ);
+        
+        // Tiny "rule" labels under each drug name show the currently-configured math so a
+        // provider can verify at-a-glance which protocol values are active.
+        const epiRule    = `${cE.pedsPerKg} mg/kg · 1:10k`;
+        const lido1Rule  = `${cL.pedsFirstPerKg} mg/kg`;
+        const lido2Rule  = `${cL.pedsSubsequentPerKg} mg/kg`;
+        const bicarbRule = `${cBi.pedsPerKg} mEq/kg`;
+        const calRule    = `${cCa.pedsPerKg} mg/kg · ${cCa.concMgPerMl} mg/mL`;
+        const magRule    = `${cMg.pedsPerKg} mg/kg · max ${cMg.pedsMaxMg} mg`;
+        const narcanRule = `${cN.pedsPerKg} mg/kg · ${cN.concMgPerMl} mg/mL`;
+        const d10Rule    = `${cD.pedsMlPerKg} mL/kg · max ${cD.pedsMaxMl}`;
+        const fluidsRule = `${cFl.pedsBolusMlPerKg} mL/kg`;
+        const pEpiRule   = `max ${cPe.pedsMaxMl} mL`;
+
         // Build aligned table rows so the mL column lines up vertically.
         // Easy to scan under pressure: drug | dose | mL.
         document.getElementById('ped-dose-list').innerHTML = `
             <table class="ped-dose-table">
                 <tr><th>Drug</th><th>Dose</th><th>mL</th></tr>
-                <tr><td><strong>Epi 1:10k</strong><br><span class="ped-mini">0.01 mg/kg</span></td><td>${epiMg} mg</td><td><strong>${epiMl} mL</strong></td></tr>
-                <tr><td><strong>Lido 1st</strong><br><span class="ped-mini">1 mg/kg</span></td><td>${lido1Mg} mg</td><td><strong>${lido1Ml} mL</strong></td></tr>
-                <tr><td><strong>Lido 2nd+</strong><br><span class="ped-mini">0.5 mg/kg</span></td><td>${lido2Mg} mg</td><td><strong>${lido2Ml} mL</strong></td></tr>
-                <tr><td><strong>Bicarb</strong><br><span class="ped-mini">1 mEq/kg · 50/50</span></td><td>${bicarbMeq} mEq</td><td><strong>${bicarbMl} mL</strong></td></tr>
-                <tr><td><strong>CaCl</strong><br><span class="ped-mini">20 mg/kg · 1g/10mL</span></td><td>${calMg} mg</td><td><strong>${calMl} mL</strong></td></tr>
-                <tr><td><strong>Mag</strong><br><span class="ped-mini">50 mg/kg · 5g/10mL</span></td><td>${magMg} mg</td><td><strong>${magMl} mL</strong></td></tr>
-                <tr><td><strong>Narcan</strong><br><span class="ped-mini">0.1 mg/kg · 0.4 mg/mL</span></td><td>${narcanMg} mg</td><td><strong>${narcanMl} mL</strong></td></tr>
-                <tr><td><strong>D10</strong><br><span class="ped-mini">5 mL/kg · max 250</span></td><td>—</td><td><strong>${d10Ml} mL</strong></td></tr>
-                <tr><td><strong>Fluid Bolus</strong><br><span class="ped-mini">20 mL/kg</span></td><td>—</td><td><strong>${fluids} mL</strong></td></tr>
-                <tr><td><strong>Push Epi</strong><br><span class="ped-mini">max 1 mL</span></td><td>—</td><td><strong>${pEpiMl} mL</strong></td></tr>
-                <tr class="ped-dose-defib"><td colspan="3"><strong>Defib (J):</strong> 1st ${w*2} · 2nd ${w*4} · 3rd+ ${w*6}–${w*10}</td></tr>
+                <tr><td><strong>Epi 1:10k</strong><br><span class="ped-mini">${epiRule}</span></td><td>${epiMg} mg</td><td><strong>${epiMl} mL</strong></td></tr>
+                <tr><td><strong>Lido 1st</strong><br><span class="ped-mini">${lido1Rule}</span></td><td>${lido1Mg} mg</td><td><strong>${lido1Ml} mL</strong></td></tr>
+                <tr><td><strong>Lido 2nd+</strong><br><span class="ped-mini">${lido2Rule}</span></td><td>${lido2Mg} mg</td><td><strong>${lido2Ml} mL</strong></td></tr>
+                <tr><td><strong>Bicarb</strong><br><span class="ped-mini">${bicarbRule}</span></td><td>${bicarbMeq} mEq</td><td><strong>${bicarbMl} mL</strong></td></tr>
+                <tr><td><strong>CaCl</strong><br><span class="ped-mini">${calRule}</span></td><td>${calMg} mg</td><td><strong>${calMl} mL</strong></td></tr>
+                <tr><td><strong>Mag</strong><br><span class="ped-mini">${magRule}</span></td><td>${magMg} mg</td><td><strong>${magMl} mL</strong></td></tr>
+                <tr><td><strong>Narcan</strong><br><span class="ped-mini">${narcanRule}</span></td><td>${narcanMg} mg</td><td><strong>${narcanMl} mL</strong></td></tr>
+                <tr><td><strong>D10</strong><br><span class="ped-mini">${d10Rule}</span></td><td>—</td><td><strong>${d10Ml} mL</strong></td></tr>
+                <tr><td><strong>Fluid Bolus</strong><br><span class="ped-mini">${fluidsRule}</span></td><td>—</td><td><strong>${fluids} mL</strong></td></tr>
+                <tr><td><strong>Push Epi</strong><br><span class="ped-mini">${pEpiRule}</span></td><td>—</td><td><strong>${pEpiMl} mL</strong></td></tr>
+                <tr class="ped-dose-defib"><td colspan="3"><strong>Defib (J):</strong> 1st ${defib1} · 2nd ${defib2} · 3rd+ ${defib3}–${defib10}</td></tr>
             </table>
         `;
         document.getElementById('ped-cheat-card').classList.remove('hidden');
@@ -2469,7 +3127,8 @@
         if (state.pushEpiActive) {
             let pe = 'Push-dose epi running';
             if (state.isPediatric && state.pediatricWeight) {
-                const ml = Math.min(state.pediatricWeight * 0.1, 1.0).toFixed(2);
+                const cPe = medConfig.pushEpi;
+                const ml = Math.min(state.pediatricWeight * cPe.pedsMlPerKg, cPe.pedsMaxMl).toFixed(2);
                 pe += ` (${ml} mL)`;
             }
             postRosc.push(pe);
@@ -2755,11 +3414,12 @@
     }
 
     function handleEpiClick() {
+        const cE = medConfig.epi;
         if (state.isPediatric) {
             if (!state.pedsEpiDose) {
                 if (state.pediatricWeight) {
-                    // PALS: 0.01 mg/kg; cap at 1 mg max single dose
-                    const mgDose = parseFloat(Math.min(state.pediatricWeight * 0.01, 1.0).toFixed(2));
+                    // PALS: configurable per-kg with single-dose cap
+                    const mgDose = parseFloat(Math.min(state.pediatricWeight * cE.pedsPerKg, cE.pedsMaxMg).toFixed(2));
                     document.getElementById('peds-epi-dose-input').value = mgDose;
                     updatePedsEpiMlDisplay();
                 }
@@ -2767,21 +3427,22 @@
                 input.oninput = updatePedsEpiMlDisplay;
                 openModal('modal-peds-epi');
             } else {
-                // state.pedsEpiDose is stored as mg now
-                const ml = (parseFloat(state.pedsEpiDose) / 0.1).toFixed(2);
+                // state.pedsEpiDose is stored as mg
+                const ml = (parseFloat(state.pedsEpiDose) / cE.concMgPerMl).toFixed(2);
                 logAction(`Administered Epinephrine ${state.pedsEpiDose} mg = ${ml} mL (1:10,000)`);
                 startEpiTimer();
             }
         } else {
-            logAction("Administered Epinephrine 1 mg IV/IO (1:10,000)");
+            const adultMl = (cE.adultDoseMg / cE.concMgPerMl).toFixed(1);
+            logAction(`Administered Epinephrine ${cE.adultDoseMg} mg IV/IO (${adultMl} mL of 1:10,000)`);
             startEpiTimer();
         }
     }
 
     function updatePedsEpiMlDisplay() {
         const mg = parseFloat(document.getElementById('peds-epi-dose-input').value) || 0;
-        // 1:10,000 = 0.1 mg/mL → mL = mg / 0.1
-        const ml = (mg / 0.1).toFixed(2);
+        // mL = mg / concentration — configurable concentration
+        const ml = (mg / medConfig.epi.concMgPerMl).toFixed(2);
         const disp = document.getElementById('peds-epi-ml-display');
         if (disp) disp.textContent = mg > 0 ? `= ${ml} mL` : '';
     }
@@ -2789,8 +3450,8 @@
     function saveAndLogPedsEpi() {
         const mg = document.getElementById('peds-epi-dose-input').value;
         if (mg) {
-            const ml = (parseFloat(mg) / 0.1).toFixed(2);
-            state.pedsEpiDose = mg; // stored as mg now
+            const ml = (parseFloat(mg) / medConfig.epi.concMgPerMl).toFixed(2);
+            state.pedsEpiDose = mg; // stored as mg
             logAction(`Administered Epinephrine ${mg} mg = ${ml} mL (1:10,000)`);
             startEpiTimer();
         }
@@ -2845,12 +3506,13 @@
     function getNextLidoDose() {
         const w = parseFloat(document.getElementById('adult-lido-weight').value);
         if (!w || w <= 0) return null;
+        const cL = medConfig.lidocaine;
         const isFirst = state.lidoDoses === 0;
         const mgPerKg = state.isPediatric
-            ? (isFirst ? 1.0 : 0.5)
-            : (isFirst ? 1.5 : 0.75);
+            ? (isFirst ? cL.pedsFirstPerKg : cL.pedsSubsequentPerKg)
+            : (isFirst ? cL.adultFirstPerKg : cL.adultSubsequentPerKg);
         const mg = parseFloat((w * mgPerKg).toFixed(2));
-        const ml = parseFloat((mg / 20).toFixed(2));
+        const ml = parseFloat((mg / cL.concMgPerMl).toFixed(2));
         const label = isFirst ? '1st Dose' : `Dose #${state.lidoDoses + 1} (subsequent)`;
         return { mg, ml, label, mgPerKg };
     }
@@ -2859,7 +3521,8 @@
         const w = parseFloat(document.getElementById('adult-lido-weight').value);
         const dosesGiven = state.lidoDoses;
         const totalMg = state.lidoTotalMg || 0;
-        const maxMg = w ? parseFloat((w * 3).toFixed(1)) : null;
+        const maxPerKg = medConfig.lidocaine.cumulativeMaxPerKg;
+        const maxMg = w ? parseFloat((w * maxPerKg).toFixed(1)) : null;
         
         document.getElementById('lido-doses-given').textContent = dosesGiven;
         document.getElementById('lido-total-mg-disp').textContent = totalMg.toFixed(1);
@@ -2869,10 +3532,10 @@
         const logBtn = document.getElementById('btn-log-adult-lido');
         const warn = document.getElementById('lido-max-warning');
         
-        // Max warning if cumulative meets or exceeds 3 mg/kg
+        // Max warning if cumulative meets or exceeds configured mg/kg ceiling
         if (w && totalMg >= maxMg) {
             warn.classList.remove('hidden');
-            warn.textContent = `⚠️ Max cumulative dose reached (${totalMg.toFixed(1)} of ${maxMg} mg = 3 mg/kg)`;
+            warn.textContent = `⚠️ Max cumulative dose reached (${totalMg.toFixed(1)} of ${maxMg} mg = ${maxPerKg} mg/kg)`;
         } else {
             warn.classList.add('hidden');
         }
@@ -2882,11 +3545,11 @@
             document.getElementById('lido-next-mg').textContent = next.mg;
             document.getElementById('lido-next-ml').textContent = next.ml;
             nextBox.classList.remove('hidden');
-            // If next dose would push total past 3 mg/kg, still allow but warn
+            // If next dose would push total past ceiling, still allow but warn
             const projected = totalMg + next.mg;
             if (maxMg && projected > maxMg) {
                 warn.classList.remove('hidden');
-                warn.textContent = `⚠️ Next dose would exceed 3 mg/kg max (cumulative would be ${projected.toFixed(1)} of ${maxMg} mg)`;
+                warn.textContent = `⚠️ Next dose would exceed ${maxPerKg} mg/kg max (cumulative would be ${projected.toFixed(1)} of ${maxMg} mg)`;
             }
             logBtn.disabled = false;
         } else {
@@ -2900,6 +3563,7 @@
         if (!w) return;
         const next = getNextLidoDose();
         if (!next) return;
+        const maxPerKg = medConfig.lidocaine.cumulativeMaxPerKg;
         
         // Store weight on appropriate state field for next time
         if (state.isPediatric) {
@@ -2911,7 +3575,7 @@
         state.lidoDoses++;
         state.lidoTotalMg = (state.lidoTotalMg || 0) + next.mg;
         
-        const ofMax = w ? ` (cumulative ${state.lidoTotalMg.toFixed(1)} of ${(w * 3).toFixed(1)} mg max)` : '';
+        const ofMax = w ? ` (cumulative ${state.lidoTotalMg.toFixed(1)} of ${(w * maxPerKg).toFixed(1)} mg max)` : '';
         logAction(`Administered Lidocaine ${next.mg} mg = ${next.ml} mL${ofMax}`);
         
         state.lidoActive = true;
@@ -2921,8 +3585,8 @@
         closeModal('modal-adult-lido');
         
         // Toast warning if at/past max
-        if (w && state.lidoTotalMg >= w * 3) {
-            showToast(`⚠️ Max lido (3 mg/kg) reached`, 4000);
+        if (w && state.lidoTotalMg >= w * maxPerKg) {
+            showToast(`⚠️ Max lido (${maxPerKg} mg/kg) reached`, 4000);
         }
     }
 
@@ -2947,10 +3611,11 @@
         state.pushEpiActive = true;
         state.pushEpiTimer = 60;
         state.pushEpiChimed = false; // reset so the next interval can chime when it expires
-        // For peds, also display & log the calculated mL dose (max 1 mL push-dose epi)
+        // For peds, also display & log the calculated mL dose (configurable max push-dose epi)
         let doseLabel = '';
         if (state.isPediatric && state.pediatricWeight) {
-            const ml = parseFloat(Math.min(state.pediatricWeight * 0.1, 1.0).toFixed(2));
+            const cPe = medConfig.pushEpi;
+            const ml = parseFloat(Math.min(state.pediatricWeight * cPe.pedsMlPerKg, cPe.pedsMaxMl).toFixed(2));
             doseLabel = `${ml} mL push-dose epi`;
             logAction(`Administered Push Dose Epinephrine (${ml} mL)`);
             const lbl = document.getElementById('push-epi-dose-label');
@@ -2983,23 +3648,25 @@
             return;
         }
 
+        const cA = medConfig.atropine;
         let doseMg, mlForDose, info;
         if (state.isPediatric) {
             const w = state.pediatricWeight;
-            doseMg = Math.max(0.1, Math.min(0.5, parseFloat((w * 0.02).toFixed(2))));
-            mlForDose = parseFloat((doseMg / 0.1).toFixed(1));
+            // PALS: per-kg with min/max bracketing the single dose
+            doseMg = Math.max(cA.pedsMinMg, Math.min(cA.pedsMaxMg, parseFloat((w * cA.pedsPerKg).toFixed(2))));
+            mlForDose = parseFloat((doseMg / cA.concMgPerMl).toFixed(1));
             info = `<strong>Pediatric (PALS — symptomatic bradycardia)</strong><br>
-                    0.02 mg/kg IV/IO (min 0.1 mg, max single 0.5 mg)<br>
+                    ${cA.pedsPerKg} mg/kg IV/IO (min ${cA.pedsMinMg} mg, max single ${cA.pedsMaxMg} mg)<br>
                     <strong style="color:var(--primary-blue); font-size:1.15em;">${doseMg} mg = ${mlForDose} mL</strong><br>
-                    <small style="color:var(--text-muted);">1 mg / 10 mL pre-filled syringe (0.1 mg/mL)</small>`;
+                    <small style="color:var(--text-muted);">Concentration ${cA.concMgPerMl} mg/mL</small>`;
         } else {
-            doseMg = 1.0;
-            mlForDose = 10;
+            doseMg = cA.adultDoseMg;
+            mlForDose = parseFloat((doseMg / cA.concMgPerMl).toFixed(1));
             info = `<strong>Adult (ACLS — symptomatic bradycardia)</strong><br>
-                    1 mg IV/IO, repeat q3–5 min<br>
-                    <strong>Max total: 3 mg</strong><br>
-                    <strong style="color:var(--primary-blue); font-size:1.15em;">1 mg = 10 mL</strong><br>
-                    <small style="color:var(--text-muted);">1 mg / 10 mL pre-filled syringe (0.1 mg/mL)</small>`;
+                    ${cA.adultDoseMg} mg IV/IO, repeat q3–5 min<br>
+                    <strong>Max total: ${cA.adultMaxTotalMg} mg</strong><br>
+                    <strong style="color:var(--primary-blue); font-size:1.15em;">${doseMg} mg = ${mlForDose} mL</strong><br>
+                    <small style="color:var(--text-muted);">Concentration ${cA.concMgPerMl} mg/mL</small>`;
         }
         infoEl.innerHTML = info;
         btn.textContent = `Give ${doseMg} mg`;
@@ -3012,8 +3679,8 @@
             : '';
 
         // Adult max warning — show but don't block
-        if (!state.isPediatric && totalSoFar + doseMg > 3) {
-            warnEl.textContent = `⚠️ This dose would exceed adult max of 3 mg total.`;
+        if (!state.isPediatric && totalSoFar + doseMg > cA.adultMaxTotalMg) {
+            warnEl.textContent = `⚠️ This dose would exceed adult max of ${cA.adultMaxTotalMg} mg total.`;
             warnEl.classList.remove('hidden');
         }
         openModal('modal-atropine');
@@ -3050,6 +3717,7 @@
             return;
         }
 
+        const cAd = medConfig.adenosine;
         const doseCount = state.adenosineDoses || 0;
         const isFirst = doseCount === 0;
         let doseMg, mlForDose, label, info;
@@ -3057,27 +3725,27 @@
         if (state.isPediatric) {
             const w = state.pediatricWeight;
             if (isFirst) {
-                doseMg = parseFloat(Math.min(w * 0.1, 6).toFixed(2));
+                doseMg = parseFloat(Math.min(w * cAd.pedsFirstPerKg, cAd.pedsFirstMaxMg).toFixed(2));
                 label = '1st dose';
             } else {
-                doseMg = parseFloat(Math.min(w * 0.2, 12).toFixed(2));
+                doseMg = parseFloat(Math.min(w * cAd.pedsSubsequentPerKg, cAd.pedsSubsequentMaxMg).toFixed(2));
                 label = `dose #${doseCount + 1}`;
             }
-            mlForDose = parseFloat((doseMg / 3).toFixed(2));
+            mlForDose = parseFloat((doseMg / cAd.concMgPerMl).toFixed(2));
             info = `<strong>Pediatric (PALS — SVT)</strong><br>
-                    1st: 0.1 mg/kg (max 6 mg) rapid IV/IO push<br>
-                    Subsequent: 0.2 mg/kg (max 12 mg)<br>
+                    1st: ${cAd.pedsFirstPerKg} mg/kg (max ${cAd.pedsFirstMaxMg} mg) rapid IV/IO push<br>
+                    Subsequent: ${cAd.pedsSubsequentPerKg} mg/kg (max ${cAd.pedsSubsequentMaxMg} mg)<br>
                     <strong style="color:var(--primary-blue); font-size:1.15em;">${label}: ${doseMg} mg = ${mlForDose} mL</strong><br>
-                    <small style="color:var(--text-muted);">3 mg/mL vial · Push fast + saline flush</small>`;
+                    <small style="color:var(--text-muted);">${cAd.concMgPerMl} mg/mL · Push fast + saline flush</small>`;
         } else {
-            doseMg = isFirst ? 6 : 12;
-            mlForDose = parseFloat((doseMg / 3).toFixed(2));
+            doseMg = isFirst ? cAd.adultFirstMg : cAd.adultSubsequentMg;
+            mlForDose = parseFloat((doseMg / cAd.concMgPerMl).toFixed(2));
             label = isFirst ? '1st dose' : `dose #${doseCount + 1}`;
             info = `<strong>Adult (ACLS — SVT)</strong><br>
-                    1st: 6 mg rapid IV push<br>
-                    2nd / 3rd: 12 mg<br>
+                    1st: ${cAd.adultFirstMg} mg rapid IV push<br>
+                    2nd / 3rd: ${cAd.adultSubsequentMg} mg<br>
                     <strong style="color:var(--primary-blue); font-size:1.15em;">${label}: ${doseMg} mg = ${mlForDose} mL</strong><br>
-                    <small style="color:var(--text-muted);">3 mg/mL vial · Push fast, follow with 20 mL saline flush, elevate arm</small>`;
+                    <small style="color:var(--text-muted);">${cAd.concMgPerMl} mg/mL · Push fast, follow with 20 mL saline flush, elevate arm</small>`;
         }
         infoEl.innerHTML = info;
         btn.textContent = `Give ${doseMg} mg`;
@@ -3221,9 +3889,9 @@
 
     function openFluidsStart() {
         closeModal('modal-interventions');
-        // Pre-compute peds bolus volume if applicable
+        // Pre-compute peds bolus volume if applicable (configurable mL/kg)
         if (state.isPediatric && state.pediatricWeight) {
-            const ml = Math.round(state.pediatricWeight * 20);
+            const ml = Math.round(state.pediatricWeight * medConfig.fluids.pedsBolusMlPerKg);
             document.getElementById('peds-fluid-calc-display').textContent = `${ml} mL`;
             document.getElementById('btn-start-peds-fluid').dataset.ml = ml;
         }
@@ -3284,6 +3952,23 @@
         closeModal('modal-interventions');
         intubStartTime = state.totalTime;
         intubPausedCPR = false;
+        
+        // Update the attempt banner — shows which attempt # is being made (counter +1
+        // because it hasn't been logged yet). After 3, the banner turns red and pulses
+        // as a non-verbal cue that the team should reconsider approach.
+        const upcomingAttempt = (state.intubAttempts || 0) + 1;
+        const banner = document.getElementById('intub-attempt-banner');
+        if (banner) {
+            if (upcomingAttempt > 3) {
+                banner.textContent = `Attempt #${upcomingAttempt} — Consider alternate device or provider`;
+                banner.classList.add('over-limit');
+                // One short urgent chime so attention is drawn even if eyes are on the patient.
+                playUrgentAlarm();
+            } else {
+                banner.textContent = `Attempt #${upcomingAttempt}`;
+                banner.classList.remove('over-limit');
+            }
+        }
         
         if (state.isPediatric) {
             // In peds, ETT is completely disabled — only i-gel available
@@ -3354,7 +4039,12 @@
         const confirmsArr = Array.from(document.querySelectorAll('.chip-confirm.active')).map(el => el.innerText);
         const confirms = confirmsArr.join(', ');
         
-        let logStr = `${airwayMode} Attempt ${isSuccess ? 'SUCCESSFUL' : 'FAILED'} (Duration: ${formatCountdown(duration, true)}). `;
+        // Increment FIRST so the attempt number in the log matches what the banner showed.
+        // undoLastLog() decrements this if the user undoes the entry.
+        state.intubAttempts = (state.intubAttempts || 0) + 1;
+        const attemptNum = state.intubAttempts;
+        
+        let logStr = `${airwayMode} Attempt #${attemptNum} ${isSuccess ? 'SUCCESSFUL' : 'FAILED'} (Duration: ${formatCountdown(duration, true)}). `;
         
         let size = '?', depth = null;
         if (isSuccess) {
@@ -3410,35 +4100,37 @@
         
         if (type === 'Defibrillation') {
             if (state.isPediatric && state.pediatricWeight) {
+                const cDf = medConfig.defib;
                 const shockNum = state.totalShocks + 1;
-                let jPerKg = 2;
-                if(shockNum === 2) jPerKg = 4;
-                if(shockNum === 3) jPerKg = 6;
-                if(shockNum === 4) jPerKg = 8;
-                if(shockNum >= 5) jPerKg = 10;
-                input.value = Math.min(state.pediatricWeight * jPerKg, 200);
+                let jPerKg = cDf.pedsFirstJperKg;
+                if (shockNum === 2) jPerKg = cDf.pedsSecondJperKg;
+                if (shockNum >= 3) jPerKg = cDf.pedsThirdPlusJperKg;
+                input.value = Math.min(state.pediatricWeight * jPerKg, cDf.pedsMaxJ);
             } else {
-                input.value = 200; 
+                input.value = medConfig.defib.adultDefaultJ;
             }
         }
         else if (state.isPediatric && state.pediatricWeight) {
             const w = state.pediatricWeight;
-            // PALS doses (peds)
-            if (type === 'Bicarbonate') input.value = parseFloat((w * 1.0).toFixed(1));        // 1 mEq/kg
-            if (type === 'Calcium') input.value = parseFloat((w * 20).toFixed(1));             // 20 mg/kg CaCl
-            if (type === 'Dextrose') input.value = parseFloat(Math.min(w * 5, 250).toFixed(1));// D10 5 mL/kg max 250
-            if (type === 'Magnesium') input.value = parseFloat(Math.min(w * 50, 2000).toFixed(1)); // 50 mg/kg max 2g
-            if (type === 'Narcan') input.value = parseFloat(Math.min(w * 0.1, 2.0).toFixed(2));    // 0.1 mg/kg max 2 mg
-            // Fluids Complete default: 20 mL/kg bolus
-            if (type === 'Fluids Complete') input.value = parseFloat((w * 20).toFixed(0));
+            // PALS doses (peds) — every value sourced from medConfig
+            if (type === 'Bicarbonate') input.value = parseFloat((w * medConfig.bicarbonate.pedsPerKg).toFixed(1));
+            if (type === 'Calcium')     input.value = parseFloat((w * medConfig.calcium.pedsPerKg).toFixed(1));
+            if (type === 'Dextrose')    input.value = parseFloat(Math.min(w * medConfig.dextrose.pedsMlPerKg, medConfig.dextrose.pedsMaxMl).toFixed(1));
+            if (type === 'Magnesium')   input.value = parseFloat(Math.min(w * medConfig.magnesium.pedsPerKg, medConfig.magnesium.pedsMaxMg).toFixed(1));
+            if (type === 'Narcan') {
+                const nCfg = medConfig.narcan;
+                input.value = parseFloat(Math.min(w * nCfg.pedsPerKg, nCfg.pedsMaxMg).toFixed(2));
+            }
+            // Fluids Complete default: configurable mL/kg bolus
+            if (type === 'Fluids Complete') input.value = parseFloat((w * medConfig.fluids.pedsBolusMlPerKg).toFixed(0));
         }
         else {
-            // ADULT default doses (AHA-recommended)
-            if (type === 'Bicarbonate') input.value = 50;        // 50 mEq (1 amp)
-            if (type === 'Calcium')     input.value = 1000;      // 1 g Calcium Chloride
-            if (type === 'Dextrose')    input.value = 25;        // 25 g (D50 50 mL, or D10 250 mL — use g)
-            if (type === 'Magnesium')   input.value = 2000;      // 2 g (Torsades)
-            if (type === 'Narcan')      input.value = 2;         // 2 mg IV/IM/IN
+            // ADULT default doses — all sourced from medConfig
+            if (type === 'Bicarbonate') input.value = medConfig.bicarbonate.adultDoseMEq;
+            if (type === 'Calcium')     input.value = medConfig.calcium.adultDoseMg;
+            if (type === 'Dextrose')    input.value = medConfig.dextrose.adultDoseG;
+            if (type === 'Magnesium')   input.value = medConfig.magnesium.adultDoseMg;
+            if (type === 'Narcan')      input.value = medConfig.narcan.adultDoseMg;
             if (type === 'Glucose')     input.value = '';        // No default — measured
             if (type === 'ETCO2')       input.value = '';        // No default — measured
         }
@@ -3543,6 +4235,10 @@
         const timestamp = getFormattedTime();
         const entry = `[${timestamp}] ${text}`;
         state.logs.push(entry);
+        // While in ROSC phase, every new log entry may satisfy a checklist item
+        // (airway placed, glucose checked, ETCO2 in range, etc.) — re-evaluate so
+        // checks auto-tick the moment their underlying data lands in state.
+        if (state.currentPhase === 'ROSC') autoTickRoscChecklist();
         renderLogs();
     }
 
@@ -3619,6 +4315,10 @@
         }
         if (popped.includes("Attempt SUCCESSFUL")) {
             state.airway = null;
+            if (state.intubAttempts > 0) state.intubAttempts--;
+        }
+        if (popped.includes("Attempt FAILED")) {
+            if (state.intubAttempts > 0) state.intubAttempts--;
         }
         if (popped.includes("Access Established")) {
             if (state.vascular?.length) state.vascular.pop();
