@@ -3,7 +3,7 @@
    Strategy: cache-first for the app shell, network fallback when online.
 */
 
-const CACHE_NAME = 'slf-scribe-v6';
+const CACHE_NAME = 'slf-scribe-v8';
 const APP_SHELL = [
     './',
     './index.html',

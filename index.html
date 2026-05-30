@@ -72,7 +72,10 @@
     }
 
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-    html, body { overscroll-behavior-y: contain; max-width: 100%; overflow-x: hidden; }
+    /* overflow-x: clip (not hidden) — setting overflow-x:hidden on the root element forces
+       the computed overflow-y to `auto`, which on Android Chrome can hijack/break normal
+       document scrolling. `clip` still prevents horizontal overflow without that side effect. */
+    html, body { overscroll-behavior-y: contain; max-width: 100%; overflow-x: clip; }
     body {
         background-color: var(--bg-color);
         color: var(--text-main);
@@ -83,22 +86,26 @@
         padding-right: max(10px, env(safe-area-inset-right));
         padding-top: max(10px, env(safe-area-inset-top));
         padding-bottom: max(10px, env(safe-area-inset-bottom));
-        overflow-x: hidden;
+        overflow-x: clip;
         touch-action: manipulation;
         min-height: 100vh;
         min-height: 100dvh;
         width: 100%;
     }
-    /* iOS Safari-grade body scroll lock when a modal is open.
-       `overflow: hidden` alone DOES NOT actually prevent body scroll on iOS Safari —
-       and worse, when a modal scrolls internally, iOS can leave the body in a wider
-       layout state after the modal closes (the bug screen recording captured this).
-       The robust pattern is position:fixed + explicit 100% width + restore scrollY on close.
-       JS in openModal/closeModal handles saving/restoring scroll position. */
+    /* Body scroll lock when a modal is open.
+       Base lock (all platforms): overflow:hidden — honored by Android Chrome & desktop. */
     body.modal-open {
+        overflow: hidden;
+    }
+    /* iOS-only escalation. iOS Safari ignores `overflow: hidden` on body and lets the page
+       scroll behind a modal — and can leave the body in a wider layout state after close.
+       The robust iOS fix is position:fixed + 100% width + restore scrollY on close (JS in
+       openModal/closeModal). This is gated behind the `.ios-lock` class (added by JS only on
+       iOS) so Android is NEVER put into position:fixed, which previously could strand the page
+       in an unscrollable state if the class wasn't cleaned up. */
+    body.modal-open.ios-lock {
         position: fixed;
         width: 100%;
-        overflow: hidden;
     }
 
     /* Header & Top Bar */
@@ -358,13 +365,29 @@
         background: var(--input-bg);
         border-left: 3px solid var(--primary-blue);
         border-radius: 4px;
-        margin-top: 8px;
+        margin-top: 15px;
         margin-bottom: 4px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         min-width: 0;
         max-width: 100%;
+        cursor: pointer; /* tappable — opens the full Code Log modal */
+    }
+    .last-action-ribbon:active { background: var(--gray-light); }
+    /* Compact count badge on the top-bar 📋 Log button. */
+    .log-count-badge:empty { display: none; }
+    .log-count-badge {
+        display: inline-block;
+        margin-left: 5px;
+        background: var(--alert-red);
+        color: #FFF;
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1;
+        padding: 2px 6px;
+        border-radius: 10px;
+        vertical-align: middle;
     }
     
     /* Toast — slightly larger and with icon room */
@@ -794,6 +817,7 @@
         <button class="btn-small danger hidden" id="btn-end-code-top" onclick="openModal('modal-end')">End Code</button>
     </div>
     <div style="margin-left: auto; display:flex; gap:5px;">
+        <button class="btn-small blue hidden" id="btn-log" onclick="openCodeLog()">📋 Log<span id="btn-log-count" class="log-count-badge"></span></button>
         <button class="btn-small blue" id="btn-archive" onclick="openArchive()">Archive</button>
         <button class="btn-small hidden" id="btn-undo" onclick="undoLastLog()">Undo</button>
     </div>
@@ -883,7 +907,7 @@
                 <div class="time-overdue-etco2 hidden" id="etco2-overdue"></div>
                 <button class="btn-large btn-full" onclick="openEtco2Slider()">RECORD ETCO2</button>
             </div>
-            <div class="card gold-trim arrest-only-card hidden" id="card-lido">
+            <div class="card gold-trim arrest-only-card" id="card-lido">
                 <button class="btn-small danger" onclick="cancelLido()" aria-label="Cancel Lidocaine Timer" style="position:absolute; top:4px; right:4px; padding:2px 6px; font-size:0.7em; line-height:1; min-height:24px; min-width:24px;">×</button>
                 <div class="timer-label">Next <strong style="color:var(--text-main);">LIDOCAINE</strong></div>
                 <div class="time-display" id="clock-lido">--:--</div>
@@ -978,13 +1002,9 @@
                 <button class="btn-large btn-gold" onclick="openInterventions()">Interventions</button>
                 <button class="btn-large" onclick="openModal('modal-ht')">H's & T's</button>
             </div>
-            <div style="margin-top: 15px; display:flex; justify-content:space-between; align-items:center;">
-                <h4 style="margin: 0; color: var(--primary-blue);">Code Log <span id="log-count" style="font-size:0.7em; color:var(--text-muted); font-weight:normal;"></span></h4>
-                <button class="btn-small" id="btn-toggle-log" onclick="toggleCodeLog()">Show Full Log</button>
-            </div>
-            <!-- Last action ribbon — visible only when log is collapsed -->
-            <div class="last-action-ribbon hidden" id="last-action-ribbon">Last: —</div>
-            <div class="log-container hidden" id="log-window"></div>
+            <!-- Slim at-a-glance last-action line. Tap to open the full Code Log modal
+                 (also reachable from the 📋 Log button in the top bar). -->
+            <div class="last-action-ribbon hidden" id="last-action-ribbon" onclick="openCodeLog()" role="button" tabindex="0" title="Open full code log">Last: —</div>
         </div>
     </div>
 </div>
@@ -1891,11 +1911,30 @@
     </div>
 </div>
 
+<!-- Code Log — full timeline, opened from the 📋 Log button (top bar) or the last-action line. -->
+<div id="modal-log" class="modal-overlay">
+    <div class="modal">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h2 style="margin:0; color:var(--primary-blue);">Code Log <span id="log-count" style="font-size:0.6em; color:var(--text-muted); font-weight:normal;"></span></h2>
+            <button class="btn-small btn-gray" onclick="closeModal('modal-log')">Close</button>
+        </div>
+        <div class="log-container" id="log-window" style="height:auto; max-height:65vh;"></div>
+    </div>
+</div>
+
 <!-- Archive -->
 <div id="modal-archive" class="modal-overlay">
     <div class="modal">
         <h2>Case Archive</h2>
         <div id="archive-list" style="max-height: 50vh; overflow-y: auto; margin-bottom: 15px;"></div>
+        <!-- Backup / restore — the archive otherwise lives ONLY in this browser, which mobile
+             OSes can evict. Export writes a file the user controls; Import restores it (or moves
+             cases to another device). -->
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+            <button class="btn-large btn-blue" style="flex:1;" onclick="exportArchive()">Export Backup</button>
+            <button class="btn-large btn-gray" style="flex:1;" onclick="document.getElementById('archive-import-file').click()">Import Backup</button>
+        </div>
+        <input type="file" id="archive-import-file" accept="application/json,.json" style="display:none" onchange="importArchive(event)">
         <button class="btn-large btn-full btn-red" onclick="clearArchive()" style="margin-bottom: 10px;">Clear All Data</button>
         <button class="btn-large btn-full btn-gray" onclick="closeModal('modal-archive')">Close</button>
     </div>
@@ -2360,6 +2399,7 @@
         // garbage into a dose calculator would be worse than not saving at all.
         const newConfig = JSON.parse(JSON.stringify(medConfig));
         const errors = [];
+        const suspicious = []; // values wildly off the factory default — likely a typo
         CONFIG_FIELD_MAP.forEach(([id, path]) => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -2369,26 +2409,48 @@
                 return;
             }
             setConfigValue(newConfig, path, v);
+            // Fat-finger guard: flag anything more than 50× above or below the factory
+            // default for the same field. 50× is generous enough that real protocol
+            // variation never trips it, but a missed/extra decimal (e.g. 10 mg epi
+            // instead of 1) does. We warn but still let the user proceed on confirm.
+            const def = getConfigValue(DEFAULT_MED_CONFIG, path);
+            if (typeof def === 'number' && def > 0 && (v > def * 50 || v < def / 50)) {
+                suspicious.push(path.split('.').pop());
+            }
         });
         if (errors.length) {
             showToast(`Invalid values: ${errors.length} field(s) need positive numbers`);
             return;
         }
-        medConfig = newConfig;
-        try {
-            localStorage.setItem('medConfig', JSON.stringify(medConfig));
-        } catch (e) {
-            console.warn('saveSettings failed:', e);
-            showToast('Could not save (storage full?)');
-            return;
+
+        // Commit step — pulled out so it can run directly or after a confirmation.
+        const commit = () => {
+            medConfig = newConfig;
+            try {
+                localStorage.setItem('medConfig', JSON.stringify(medConfig));
+            } catch (e) {
+                console.warn('saveSettings failed:', e);
+                showToast('Could not save (storage full?)');
+                return;
+            }
+            // If a peds code is already running and weight is set, refresh the cheat-card doses
+            // so the new concentrations/per-kg values appear immediately without restarting the code.
+            if (state.isActive && state.isPediatric && state.pediatricWeight) {
+                setPedWeight(state.pediatricWeight);
+            }
+            closeModal('modal-settings');
+            showToast('Settings saved');
+        };
+
+        if (suspicious.length) {
+            customConfirm(
+                `${suspicious.length} value(s) look unusually high or low (${suspicious.slice(0, 4).join(', ')}${suspicious.length > 4 ? '…' : ''}). Double-check for a typo. Save anyway?`,
+                commit,
+                'Unusual dose values'
+            );
+        } else {
+            commit();
         }
-        // If a peds code is already running and weight is set, refresh the cheat-card doses
-        // so the new concentrations/per-kg values appear immediately without restarting the code.
-        if (state.isActive && state.isPediatric && state.pediatricWeight) {
-            setPedWeight(state.pediatricWeight);
-        }
-        closeModal('modal-settings');
-        showToast('Settings saved');
     }
 
     // --- System Variables ---
@@ -2542,6 +2604,22 @@
         }
     }
 
+    // --- Code Clock helpers ---
+    // The Code Clock counts from the FIRST chest compression, not from patient-type
+    // selection. Time spent on scene before CPR begins is intentionally excluded so the
+    // clock reflects actual resuscitation time. startTime stays the real wall clock so
+    // log timestamps remain accurate.
+    function codeClockSeconds() {
+        if (!state.cprHasStarted) return 0;
+        return Math.max(0, state.totalTime - (state.cprStartedAtTotalTime || 0));
+    }
+    // Convert a stored absolute totalTime anchor (e.g. first-defib time) into a value
+    // measured from the Code Clock's zero point, so metrics stay consistent with the clock.
+    function toCodeClockSeconds(anchor) {
+        if (anchor == null) return null;
+        return Math.max(0, anchor - (state.cprStartedAtTotalTime || 0));
+    }
+
     // --- Timer Engine (wall-clock based to survive iOS Safari throttling) ---
     function processTimers() {
         if (!state.isActive) return;
@@ -2561,7 +2639,7 @@
         // achieved. Once a ROSC has happened (even if patient re-arrests later), termination
         // criteria don't apply — the brain has demonstrated reperfusion potential, so the
         // resuscitation should continue regardless of clock time.
-        if (state.totalTime >= 1200 && state.currentPhase === 'ARREST' && !state.everAchievedRosc) {
+        if (codeClockSeconds() >= 1200 && state.currentPhase === 'ARREST' && !state.everAchievedRosc) {
             document.getElementById('banner-20min').classList.remove('hidden');
         }
         
@@ -2679,7 +2757,7 @@
             }
         }
 
-        document.getElementById('clock-master-text').innerText = formatCountdown(state.totalTime, true);
+        document.getElementById('clock-master-text').innerText = formatCountdown(codeClockSeconds(), true);
         saveState();
     }
 
@@ -2704,6 +2782,7 @@
         document.getElementById('btn-end-code-top').classList.remove('hidden');
         document.getElementById('btn-transport').classList.remove('hidden');
         document.getElementById('btn-undo').classList.remove('hidden');  // Now safe to expose Undo
+        document.getElementById('btn-log').classList.remove('hidden');   // Code Log accessible from the top bar
         document.getElementById('btn-archive').classList.add('hidden'); // No accidental archive opens during a code
         
         if(state.isPediatric) {
@@ -2999,7 +3078,7 @@
         if (state.initialRhythm) line(`Initial rhythm: ${state.initialRhythm}`);
 
         // === 4. CODE TIMELINE / DURATION ===
-        header(`CODE PROGRESSION (total ${formatCountdown(state.totalTime, true)})`);
+        header(`CODE PROGRESSION (total ${formatCountdown(codeClockSeconds(), true)})`);
         const totalRoscEpisodes = (state.roscTimes?.length || 0);
         if (totalRoscEpisodes > 0) {
             if (state.currentPhase === 'ROSC') {
@@ -3035,7 +3114,7 @@
             line(`${state.totalShocks} shocks delivered${energies ? ' @ ' + energies : ''}`);
             // Time-to-first-defib from code start — key survival predictor for shockable rhythms
             if (state.firstDefibAtTotalTime != null) {
-                line(`Time to first defib: ${formatCountdown(state.firstDefibAtTotalTime, true)}`);
+                line(`Time to first defib: ${formatCountdown(toCodeClockSeconds(state.firstDefibAtTotalTime), true)}`);
             }
             // Note: pads-placed is intentionally NOT in handoff — the receiving team can see the
             // pads on the patient visually, so verbalizing it just adds noise.
@@ -3341,7 +3420,15 @@
             autoTickRoscChecklist();
             // Prompt the team for the underlying ROSC rhythm — this auto-fills the 12-Lead
             setTimeout(() => openModal('modal-rosc-rhythm'), 300);
-        } 
+        }
+
+        // --- Pulse check complete: CPR resumes automatically ---
+        // The provider is no longer prompted to tap "Resume CPR" after a rhythm check —
+        // restarting compressions is implied. ROSC is the only exception (the patient has a
+        // pulse, so compressions stay off and we transitioned to the post-ROSC view above).
+        if (rhythm !== 'ROSC' && !state.cprActive) {
+            toggleCPR(); // resumes compressions (logs "CPR Resumed", restarts the metronome)
+        }
     }
 
     function reArrest() {
@@ -3379,7 +3466,8 @@
         // Restore arrest-specific cards and drop the ETCO2 full-span class
         document.getElementById('card-rhythm').classList.remove('hidden');
         document.getElementById('card-epi').classList.remove('hidden');
-        if (state.lidoActive) document.getElementById('card-lido').classList.remove('hidden');
+        // Lido card is always visible during ARREST (like Epi) — show it regardless of dose state.
+        document.getElementById('card-lido').classList.remove('hidden');
         document.getElementById('card-etco2').classList.remove('etco2-span');
         // Push-dose epi is a post-ROSC therapy (for hypotension) — hide the card on re-arrest.
         // Regular epinephrine resumes via the standard Epi timer.
@@ -3591,9 +3679,17 @@
     }
 
     function cancelLido() {
+        // Nothing to cancel if no timer is running (card is always visible now, so the ✕
+        // can be tapped before any dose — don't log a meaningless "canceled" entry).
+        if (!state.lidoActive && state.lidoTimer === null) return;
         state.lidoActive = false;
         state.lidoChimed = false; // reset for next activation
-        document.getElementById('card-lido').classList.add('hidden');
+        state.lidoTimer = null;   // stop the countdown
+        // Card stays visible (parallels Epi). Reset the display to the idle "--:--" state
+        // and clear any overdue/alarm styling instead of hiding the card.
+        renderTimerWithOverdue('clock-lido', 'lido-overdue', 'card-lido', null, 'flashing');
+        // NOTE: lidoDoses / lidoTotalMg are intentionally left intact so the cumulative
+        // 3 mg/kg tracking survives a timer cancel.
         logAction("Lidocaine Timer Canceled");
     }
 
@@ -4405,17 +4501,19 @@
             win.appendChild(div);
         });
         win.scrollTop = win.scrollHeight;
-        // Update count badge
+        // Update counts: full label inside the modal title, compact badge on the top-bar button.
         const count = (state.logs?.length || 0) + (state.ptaLogs?.length || 0);
         const countEl = document.getElementById('log-count');
         if (countEl) countEl.textContent = count > 0 ? `(${count} ${count === 1 ? 'entry' : 'entries'})` : '';
-        // Update last-action ribbon (only shown when log is collapsed)
+        const badge = document.getElementById('btn-log-count');
+        if (badge) badge.textContent = count > 0 ? String(count) : '';
+        // Update the slim last-action line (always reflects the most recent entry; tap to open log).
         const ribbon = document.getElementById('last-action-ribbon');
         if (ribbon) {
             const lastLive = state.logs?.[state.logs.length - 1];
             const lastPta = state.ptaLogs?.[state.ptaLogs.length - 1];
             const last = lastLive || lastPta;
-            if (last && win.classList.contains('hidden')) {
+            if (last) {
                 ribbon.classList.remove('hidden');
                 ribbon.textContent = `Last: ${last}`;
             } else {
@@ -4461,21 +4559,13 @@
         set('ms-etco2', state.lastEtco2 != null ? state.lastEtco2 : '--');
     }
 
-    function toggleCodeLog() {
+    function openCodeLog() {
+        // Full timeline now lives in a modal opened from the top bar (or the last-action line),
+        // instead of an inline collapsible panel at the bottom of the dashboard.
+        renderLogs();
+        openModal('modal-log');
         const win = document.getElementById('log-window');
-        const btn = document.getElementById('btn-toggle-log');
-        const ribbon = document.getElementById('last-action-ribbon');
-        if (win.classList.contains('hidden')) {
-            win.classList.remove('hidden');
-            btn.textContent = 'Hide Full Log';
-            win.scrollTop = win.scrollHeight;
-            ribbon?.classList.add('hidden');
-        } else {
-            win.classList.add('hidden');
-            btn.textContent = 'Show Full Log';
-            // Re-render to populate the ribbon
-            renderLogs();
-        }
+        if (win) win.scrollTop = win.scrollHeight; // jump to most recent entry
     }
 
     /**
@@ -4813,7 +4903,7 @@
             report += `---\n`;
         }
 
-        report += `METRICS\nTotal Code Time: ${formatCountdown(state.totalTime, true)}\n`;
+        report += `METRICS\nTotal Code Time: ${formatCountdown(codeClockSeconds(), true)}\n`;
         if (state.transportState === 2) {
             report += `Transport Time: ${formatCountdown(state.transportEnd - state.transportStart, true)}\n`;
         }
@@ -4821,7 +4911,7 @@
             `Total Epi Given: ${state.totalEpi}\n` +
             `Total Shocks: ${state.totalShocks}`;
         if (state.firstDefibAtTotalTime != null) {
-            report += `\nTime to First Defib: ${formatCountdown(state.firstDefibAtTotalTime, true)}`;
+            report += `\nTime to First Defib: ${formatCountdown(toCodeClockSeconds(state.firstDefibAtTotalTime), true)}`;
         }
         if (state.rearrests > 0) report += `\nRe-Arrest Events: ${state.rearrests}`;
 
@@ -4850,6 +4940,9 @@
         document.getElementById('btn-transport')?.classList.add('hidden');
         document.getElementById('btn-end-code-top')?.classList.add('hidden');
         document.getElementById('btn-undo')?.classList.add('hidden');
+        document.getElementById('btn-log')?.classList.add('hidden');
+        // Code is over — re-expose Archive so saved cases stay reachable from this screen.
+        document.getElementById('btn-archive')?.classList.remove('hidden');
         // Wire up the Share button (uses native share sheet — covers iMessage, Mail, etc.)
         const shareBtn = document.getElementById('complete-share-btn');
         shareBtn.onclick = () => shareReport(report);
@@ -5000,8 +5093,9 @@
             document.getElementById('btn-pt-info').classList.remove('hidden');
             document.getElementById('btn-end-code-top').classList.remove('hidden');
             document.getElementById('btn-undo').classList.remove('hidden');
+            document.getElementById('btn-log').classList.remove('hidden');
             document.getElementById('btn-archive').classList.add('hidden');
-            
+
             if (state.isPediatric) {
                 document.getElementById('sbp-target').innerText = '70';
                 document.getElementById('btn-lucas').classList.add('hidden');
@@ -5045,8 +5139,8 @@
             
             if (state.currentPhase === 'ARREST') {
                 document.getElementById('arrest-timers').classList.remove('hidden');
-                if (state.totalTime >= 1200 && !state.everAchievedRosc) document.getElementById('banner-20min').classList.remove('hidden');
-                if (state.lidoActive) document.getElementById('card-lido').classList.remove('hidden');
+                if (codeClockSeconds() >= 1200 && !state.everAchievedRosc) document.getElementById('banner-20min').classList.remove('hidden');
+                document.getElementById('card-lido').classList.remove('hidden'); // always visible in ARREST, like Epi
                 if (state.pushEpiActive) document.getElementById('card-push-epi').classList.remove('hidden');
                 
                 if (state.lucasActive) {
@@ -5221,12 +5315,13 @@
     }
 
     function showFullReport(title, text) {
-        const overlay = document.getElementById('modal-archive-view');
         document.getElementById('archive-view-title').textContent = title;
         document.getElementById('archive-view-body').textContent = text;
         document.getElementById('archive-view-share').onclick = () => shareReport(text);
         document.getElementById('archive-view-copy').onclick = () => copyReportToClipboard(text);
-        overlay.style.display = 'flex';
+        // Route through openModal (not a raw display='flex') so the body scroll-lock
+        // bookkeeping stays consistent with the rest of the modal stack.
+        openModal('modal-archive-view');
     }
 
     function deleteArchiveIndex(idx) {
@@ -5244,6 +5339,118 @@
             },
             'Delete Case?'
         );
+    }
+
+    /**
+     * Export the entire case archive to a downloadable JSON file. This is the user's
+     * own backup — the in-browser archive can be evicted by the OS, cleared by the user,
+     * or stranded on a lost device, so a portable file is the durable record.
+     */
+    function exportArchive() {
+        let archive;
+        try {
+            archive = JSON.parse(localStorage.getItem('codeArchive') || '[]');
+        } catch (_) { archive = []; }
+        if (!archive.length) {
+            showToast('No saved cases to export');
+            return;
+        }
+        const payload = {
+            app: 'Code Scribe',
+            type: 'codeArchive',
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            cases: archive
+        };
+        try {
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            // Filename includes a date stamp so multiple backups don't collide.
+            const stamp = new Date().toISOString().slice(0, 10);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `code-scribe-backup-${stamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            // Revoke on next tick so the download has time to start.
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showToast(`Exported ${archive.length} case(s)`);
+        } catch (e) {
+            console.warn('exportArchive failed:', e);
+            showToast('Export failed on this device');
+        }
+    }
+
+    /**
+     * Import cases from a previously-exported backup file. Imported cases are MERGED into
+     * the existing archive (newest first, capped at 50), and exact duplicates are skipped,
+     * so importing the same file twice is safe.
+     */
+    function importArchive(event) {
+        const input = event.target;
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            // Reset the input so selecting the same file again re-triggers onchange.
+            input.value = '';
+            let parsed;
+            try {
+                parsed = JSON.parse(reader.result);
+            } catch (_) {
+                showToast('That file is not a valid backup');
+                return;
+            }
+            // Accept either our wrapped {cases:[...]} format or a bare array.
+            const incoming = Array.isArray(parsed) ? parsed
+                : (parsed && Array.isArray(parsed.cases)) ? parsed.cases : null;
+            if (!incoming) {
+                showToast('No cases found in that file');
+                return;
+            }
+            // Keep only well-formed records.
+            const valid = incoming.filter(c => c && typeof c.title === 'string' && typeof c.report === 'string');
+            if (!valid.length) {
+                showToast('No valid cases found in that file');
+                return;
+            }
+            customConfirm(
+                `Import ${valid.length} case(s) from this backup? They'll be merged with your existing archive.`,
+                () => {
+                    let existing;
+                    try { existing = JSON.parse(localStorage.getItem('codeArchive') || '[]'); }
+                    catch (_) { existing = []; }
+                    // Dedupe by title+report so re-importing the same file doesn't duplicate.
+                    const seen = new Set(existing.map(c => `${c.title}|${c.report}`));
+                    let added = 0;
+                    valid.forEach(c => {
+                        const key = `${c.title}|${c.report}`;
+                        if (!seen.has(key)) {
+                            existing.push({ title: c.title, report: c.report, handoff: c.handoff || '' });
+                            seen.add(key);
+                            added++;
+                        }
+                    });
+                    // existing stays newest-first; imported are appended after it. Cap at 50
+                    // (matches saveToArchive), keeping the front — so the user's most recent
+                    // cases are never dropped in favor of older imported ones.
+                    if (existing.length > 50) existing.length = 50;
+                    try {
+                        localStorage.setItem('codeArchive', JSON.stringify(existing));
+                    } catch (e) {
+                        console.warn('importArchive save failed:', e);
+                        showToast('Could not save imported cases (storage full?)');
+                        return;
+                    }
+                    showToast(added ? `Imported ${added} new case(s)` : 'No new cases (already in archive)');
+                    openArchive(); // refresh the list
+                },
+                'Import Backup'
+            );
+        };
+        reader.onerror = () => { input.value = ''; showToast('Could not read that file'); };
+        reader.readAsText(file);
     }
 
     function clearArchive() {
@@ -5270,16 +5477,24 @@
      * truly freezes the page while preserving the visual scroll position.
      * On close of the LAST modal, restore static positioning and scroll back.
      */
+    // iOS needs the position:fixed scroll-lock hack; Android/desktop honor overflow:hidden
+    // and must NOT be put into position:fixed (it can strand the page unscrollable).
+    const IS_IOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS reports as Mac
     function openModal(id) {
         const wasAnyOpen = Array.from(document.querySelectorAll('.modal-overlay'))
             .some(m => m.style.display === 'flex');
         document.getElementById(id).style.display = 'flex';
         if (!wasAnyOpen) {
-            // First modal in the stack — capture scroll and lock body
-            const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
-            document.body.dataset.scrollLock = String(scrollY);
-            document.body.style.top = `-${scrollY}px`;
+            // First modal in the stack — lock the body.
             document.body.classList.add('modal-open');
+            if (IS_IOS) {
+                // Capture scroll and apply the iOS-only position:fixed escalation.
+                const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+                document.body.dataset.scrollLock = String(scrollY);
+                document.body.style.top = `-${scrollY}px`;
+                document.body.classList.add('ios-lock');
+            }
         }
     }
     function closeModal(id) {
@@ -5288,12 +5503,15 @@
         const stillOpen = Array.from(document.querySelectorAll('.modal-overlay'))
             .some(m => m.style.display === 'flex');
         if (!stillOpen) {
-            const savedY = parseInt(document.body.dataset.scrollLock || '0', 10);
             document.body.classList.remove('modal-open');
-            document.body.style.top = '';
-            delete document.body.dataset.scrollLock;
-            // Restore visual scroll position so the page doesn't jump
-            window.scrollTo(0, savedY);
+            if (IS_IOS) {
+                const savedY = parseInt(document.body.dataset.scrollLock || '0', 10);
+                document.body.classList.remove('ios-lock');
+                document.body.style.top = '';
+                delete document.body.dataset.scrollLock;
+                // Restore visual scroll position so the page doesn't jump
+                window.scrollTo(0, savedY);
+            }
         }
     }
 
