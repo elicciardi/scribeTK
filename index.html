@@ -132,45 +132,6 @@
         align-items: center;
         justify-content: center;
     }
-    /* BLS/ALS sliding switch — 🚒 fire (BLS) ⇄ 🚑 medic (ALS). A thumb slides under the active icon. */
-    .mode-seg {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        padding: 3px;
-        border: none;
-        border-radius: 16px;
-        background: var(--gray-light);
-        cursor: pointer;
-        min-height: 40px;
-        -webkit-tap-highlight-color: transparent;
-    }
-    .mode-seg-opt {
-        position: relative;
-        z-index: 1;
-        width: 34px;
-        text-align: center;
-        font-size: 1.2em;
-        line-height: 1;
-        padding: 4px 0;
-        opacity: 0.4;
-        filter: grayscale(0.6);
-        transition: opacity 0.2s, filter 0.2s;
-    }
-    .mode-seg-opt.active { opacity: 1; filter: none; }
-    .mode-seg-thumb {
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 34px;
-        height: calc(100% - 6px);
-        border-radius: 13px;
-        background: var(--card-bg);
-        box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-        transition: transform 0.2s ease;
-        z-index: 0;
-    }
     /* On very small phones the top bar fits across by shrinking further */
     @media (max-width: 480px) {
         .top-bar { gap: 4px; }
@@ -311,6 +272,15 @@
             #FFD27A 56%, #FFD27A 80%,
             #B8860B 80%, #B8860B 100%);
         margin: 8px 0;
+    }
+    /* Glucose reuses the slider sizing/thumb but needs its own color bands on a 19–601 scale:
+       red <70, green 70–140, amber 140–300, red >300. Percentages are (value-19)/582. */
+    .etco2-slider.glucose-track {
+        background: linear-gradient(to right,
+            var(--alert-red) 0%, var(--alert-red) 9%,
+            #5DBB63 9%, #5DBB63 21%,
+            #B8860B 21%, #B8860B 48%,
+            var(--alert-red) 48%, var(--alert-red) 100%);
     }
     .etco2-slider::-webkit-slider-thumb {
         -webkit-appearance: none;
@@ -629,16 +599,9 @@
 
     .hidden { display: none !important; }
 
-    /* --- Simple ("Basic") mode --------------------------------------------------
-       For lay rescuers / volunteer firefighters without EMT training. Collapses the
-       dashboard to four essentials: Code Clock + CPR, Pulse Check, Epinephrine, Defib.
-       Elements tagged `adv-only` are hidden; `simple-only` / `simple-only-inline`
-       elements appear. `.hidden` (with !important) still wins, so phase-based hiding
-       (e.g. arrest-only cards during ROSC) keeps working. Default mode is Normal. */
+    /* BLS/ALS mode was removed — the app is single-mode (full ALS). Any leftover
+       `simple-only` nodes stay hidden; `adv-only` is now a no-op (always visible). */
     .simple-only, .simple-only-inline { display: none; }
-    body.simple-mode .simple-only { display: block; }
-    body.simple-mode .simple-only-inline { display: inline; }
-    body.simple-mode .adv-only { display: none !important; }
 
     /* Sticky Code Clock — keeps the time + CPR control on screen while scrolling timers. */
     #cpr-card { position: sticky; top: 0; z-index: 50; box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
@@ -889,13 +852,6 @@
         <button class="btn-small danger hidden" id="btn-end-code-top" onclick="openModal('modal-end')">End Code</button>
     </div>
     <div style="margin-left: auto; display:flex; gap:5px;">
-        <!-- BLS/ALS mode toggle — sliding switch: 🚒 fire (BLS) ⇄ 🚑 medic (ALS). Tap to switch.
-             Visible in both modes so a medic can escalate a layperson's BLS code to ALS in-code. -->
-        <button class="mode-seg hidden" id="btn-mode-toggle" onclick="toggleUiMode()" role="switch" aria-label="Toggle BLS (fire) / ALS (medic) view" title="BLS 🚒 / ALS 🚑">
-            <span class="mode-seg-thumb"></span>
-            <span class="mode-seg-opt" data-mode="bls">🚒</span>
-            <span class="mode-seg-opt" data-mode="als">🚑</span>
-        </button>
         <!-- Log + Undo collapse to icons in-code to keep the bar from wrapping. -->
         <button class="btn-small btn-icon hidden" id="btn-log" onclick="openCodeLog()" aria-label="Code Log" title="Code Log">📋<span id="btn-log-count" class="log-count-badge"></span></button>
         <button class="btn-small btn-icon hidden" id="btn-undo" onclick="undoLastLog()" aria-label="Undo last action" title="Undo">↩</button>
@@ -943,6 +899,14 @@
             </div>
         </div>
 
+        <!-- At-a-glance code stats, directly under the clock. -->
+        <div class="mini-stats" id="mini-stats" style="margin-top: 10px;">
+            <div class="mini-stat"><span class="mini-stat-label">Shocks</span><span class="mini-stat-value" id="ms-shocks">0</span></div>
+            <div class="mini-stat"><span class="mini-stat-label">Epi</span><span class="mini-stat-value" id="ms-epi">0</span></div>
+            <div class="mini-stat"><span class="mini-stat-label">Lido</span><span class="mini-stat-value" id="ms-lido">0</span></div>
+            <div class="mini-stat"><span class="mini-stat-label">CCF</span><span class="mini-stat-value" id="ms-ccf">--%</span></div>
+        </div>
+
         <!-- Pediatric Cheat Card — two states: (1) prompt for Broselow weight, (2) doses display -->
         <div class="card ped-trim hidden adv-only" id="ped-cheat-card" style="margin-top: 10px;">
             <!-- State 1: No weight set — pulsing prompt button -->
@@ -972,10 +936,10 @@
                 <div class="time-display" id="clock-rosc">00:00</div>
             </div>
             <div class="card gold-trim arrest-only-card" id="card-rhythm">
-                <div class="timer-label">Next <strong style="color:var(--text-main);"><span class="adv-only">RHYTHM CHECK</span><span class="simple-only-inline">PULSE CHECK</span></strong></div>
+                <div class="timer-label">Next <strong style="color:var(--text-main);">RHYTHM CHECK</strong></div>
                 <div class="time-display" id="clock-rhythm">--:--</div>
                 <div class="time-overdue hidden" id="rhythm-overdue"></div>
-                <button class="btn-large btn-full" onclick="initiateRhythmCheck()"><span class="adv-only">RHYTHM CHECK</span><span class="simple-only-inline">PULSE CHECK</span></button>
+                <button class="btn-large btn-full" onclick="initiateRhythmCheck()">RHYTHM CHECK</button>
             </div>
             <div class="card gold-trim arrest-only-card" id="card-epi">
                 <div class="timer-label">Next <strong style="color:var(--text-main);">EPINEPHRINE</strong></div>
@@ -997,12 +961,6 @@
                 <div class="time-display" id="clock-lido">--:--</div>
                 <div class="time-overdue hidden" id="lido-overdue"></div>
                 <button class="btn-large btn-full" onclick="handleLidoClick()">GIVE LIDO</button>
-            </div>
-            <!-- BLS-only Defib card. One-tap shock log (no Joules prompt). Hidden in ALS mode,
-                 where defib goes through the rhythm-check / Interventions flow with an energy value. -->
-            <div class="card gold-trim arrest-only-card simple-only" id="card-defib-simple">
-                <div class="timer-label">Next <strong style="color:var(--text-main);">DEFIB</strong></div>
-                <button class="btn-large btn-full btn-red" onclick="logAedShock()">SHOCK DELIVERED</button>
             </div>
             <!-- Push-dose epi — ROSC-only, sits beside the ROSC clock and stays the whole time.
                  Timer shows --:-- until the first dose, then counts the 1-min redose interval. -->
@@ -1068,15 +1026,6 @@
 
     <!-- Right Column: Actions & Log -->
     <div class="hidden adv-only" id="action-panel">
-        <!-- Mini-stats strip — at-a-glance code progress -->
-        <div class="mini-stats" id="mini-stats">
-            <div class="mini-stat"><span class="mini-stat-label">Shocks</span><span class="mini-stat-value" id="ms-shocks">0</span></div>
-            <div class="mini-stat"><span class="mini-stat-label">Epi</span><span class="mini-stat-value" id="ms-epi">0</span></div>
-            <div class="mini-stat"><span class="mini-stat-label">Lido</span><span class="mini-stat-value" id="ms-lido">0</span></div>
-            <div class="mini-stat"><span class="mini-stat-label">CCF</span><span class="mini-stat-value" id="ms-ccf">--%</span></div>
-            <div class="mini-stat"><span class="mini-stat-label">ETCO2</span><span class="mini-stat-value" id="ms-etco2">--</span></div>
-        </div>
-
         <div class="card">
             <div class="btn-grid">
                 <button class="btn-large btn-gold" onclick="openInterventions()">Interventions</button>
@@ -1087,7 +1036,8 @@
             <div class="last-action-ribbon hidden" id="last-action-ribbon" onclick="openCodeLog()" role="button" tabindex="0" title="Open full code log">Last: —</div>
         </div>
     </div>
-</div>
+</div><!-- /.dashboard -->
+</div><!-- /#main-dashboard -->
 
 <!-- Code Complete screen — shown after report is generated, replaces auto-reload behavior -->
 <div id="complete-screen" class="complete-screen hidden">
@@ -1165,9 +1115,14 @@
     <div class="modal" style="max-width: 400px;">
         <h2>Adult Lidocaine Calculator</h2>
         <div class="input-group">
-            <label>Estimated Patient Weight (kg)</label>
-            <input type="number" id="adult-lido-weight" class="text-input" placeholder="e.g. 80" oninput="updateLbsDisplay(); refreshAdultLidoView();">
-            <div id="adult-lido-lbs-display" style="text-align:center; color:var(--text-muted); font-size:0.9em; margin-top:6px;">— lbs (for cross-check)</div>
+            <!-- Adult: weight entered in lbs via slider; converted to kg behind the scenes. -->
+            <div id="adult-lido-weight-block">
+                <label>Estimated Patient Weight</label>
+                <input type="range" id="adult-lido-weight-slider" min="80" max="280" value="176" step="1" oninput="updateLbsDisplay(); refreshAdultLidoView();" style="width:100%; margin-top:4px;">
+                <div id="adult-lido-lbs-display" style="text-align:center; font-weight:bold; color:var(--primary-blue); font-size:1.1em; margin-top:6px;">176 lbs (≈ 80 kg)</div>
+            </div>
+            <!-- Peds: weight comes from the Broselow card, not the slider. -->
+            <div id="adult-lido-peds-weight" class="hidden" style="text-align:center; font-weight:bold; color:#E91E63;"></div>
         </div>
         
         <div id="adult-lido-tracker" style="background:var(--input-bg); border:1px solid var(--border-color); padding:10px; border-radius:8px; margin-bottom:12px;">
@@ -1340,6 +1295,7 @@
         <div class="btn-grid">
             <button class="btn-large" onclick="openValuePrompt('Bicarbonate Dose', 'Bicarbonate', 'mEq')">Bicarbonate</button>
             <button class="btn-large" onclick="openValuePrompt('Calcium Dose', 'Calcium', 'mg')">Calcium</button>
+            <button class="btn-large" onclick="openValuePrompt('Magnesium Dose', 'Magnesium', 'mg')">Magnesium</button>
             <button class="btn-large" id="btn-fluids-interv" onclick="openFluidsStart()">Fluids</button>
             <button class="btn-large btn-gold" onclick="openOtherMed()">Other Medication</button>
         </div>
@@ -1497,17 +1453,6 @@
             </div>
         </div>
 
-        <label style="font-weight:bold;">Confirmation Methods</label>
-        <div class="chip-grid" style="margin-bottom: 15px;">
-            <button class="chip chip-confirm" onclick="toggleChipMulti(this)">ETCO2 Waveform</button>
-            <button class="chip chip-confirm" onclick="toggleChipMulti(this)">Auscultation</button>
-            <button class="chip chip-confirm" onclick="toggleChipMulti(this)">Equal Chest Rise</button>
-            <button class="chip chip-confirm" onclick="toggleChipMulti(this)">No Gastric Sounds</button>
-            <button class="chip chip-confirm chip-confirm-ett-only" onclick="toggleChipMulti(this)">Direct Visualization</button>
-            <button class="chip chip-confirm chip-confirm-ett-only" onclick="toggleChipMulti(this)">Video Laryngoscopy</button>
-            <button class="chip chip-confirm chip-confirm-ett-only" onclick="toggleChipMulti(this)">Condensation in Tube</button>
-        </div>
-
         <label class="checkbox-row" style="color:var(--alert-red); margin-bottom: 15px; font-weight:bold; display:flex; align-items:center; gap:8px;">
             <input type="checkbox" id="intub-cpr-pause" onchange="handleIntubCprPauseToggle()" style="transform:scale(1.5);"> CPR Interrupted for Attempt
         </label>
@@ -1542,17 +1487,13 @@
         <h2 id="rhythm-title">Pulse / Rhythm Check</h2>
         <p style="color:var(--alert-red); font-weight:bold; margin-bottom:15px;">CPR PAUSED FOR CHECK</p>
         
-        <p class="adv-only" style="font-weight:bold; margin-bottom:5px;">Select Rhythm:</p>
-        <p class="simple-only" style="font-weight:bold; margin-bottom:5px;">Is there a pulse?</p>
+        <p style="font-weight:bold; margin-bottom:5px;">Select Rhythm:</p>
         <div class="btn-grid">
-            <button class="btn-large btn-red adv-only" onclick="logRhythm('VFib')">VFib</button>
-            <button class="btn-large btn-red adv-only" onclick="logRhythm('pVT')">pVT</button>
-            <button class="btn-large adv-only" onclick="logRhythm('PEA')">PEA</button>
-            <button class="btn-large adv-only" onclick="logRhythm('Asystole')">Asystole</button>
-            <button class="btn-large btn-gold btn-full adv-only" onclick="logRhythm('ROSC')">ROSC Achieved</button>
-            <!-- Simple mode: no rhythm interpretation — just pulse present / absent. -->
-            <button class="btn-large btn-full btn-gray simple-only" onclick="logRhythm('No Pulse')">No Pulse — Continue CPR</button>
-            <button class="btn-large btn-full btn-gold simple-only" onclick="logRhythm('ROSC')">Pulse Found (ROSC)</button>
+            <button class="btn-large btn-red" onclick="logRhythm('VFib')">VFib</button>
+            <button class="btn-large btn-red" onclick="logRhythm('pVT')">pVT</button>
+            <button class="btn-large" onclick="logRhythm('PEA')">PEA</button>
+            <button class="btn-large" onclick="logRhythm('Asystole')">Asystole</button>
+            <button class="btn-large btn-gold btn-full" onclick="logRhythm('ROSC')">ROSC Achieved</button>
             <button class="btn-large btn-full btn-gray" onclick="cancelRhythmCheck()" style="margin-top:10px;">Cancel (resume CPR)</button>
         </div>
     </div>
@@ -1691,6 +1632,11 @@
         <div style="display:flex; justify-content:space-between; font-size: 0.75em; color: var(--text-muted); margin-top: 6px; padding: 0 6px;">
             <span>0</span><span>20</span><span>35–45</span><span>60</span><span>80+</span>
         </div>
+        <!-- Trend of recorded ETCO2 values across the code (target band 35–45 shaded). -->
+        <div id="etco2-trend-wrap" style="margin-top: 18px;">
+            <div style="font-size: 0.75em; color: var(--text-muted); font-weight: bold; margin-bottom: 4px;">ETCO2 Trend</div>
+            <div id="etco2-trend" style="background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px;"></div>
+        </div>
         <div class="btn-grid" style="margin-top: 20px;">
             <button class="btn-large btn-gold" onclick="logEtco2Slider()">Log Value</button>
             <button class="btn-large btn-gray" onclick="closeModal('modal-etco2-slider')">Cancel</button>
@@ -1707,9 +1653,9 @@
             <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">mg/dL</div>
             <div id="glucose-slider-context" style="margin-top: 10px; font-weight: bold; font-size: 0.9em; min-height: 1.2em;"></div>
         </div>
-        <input type="range" id="glucose-slider" class="etco2-slider" min="19" max="601" value="100" step="1" oninput="updateGlucoseSlider()">
+        <input type="range" id="glucose-slider" class="etco2-slider glucose-track" min="19" max="601" value="100" step="1" oninput="updateGlucoseSlider()">
         <div style="display:flex; justify-content:space-between; font-size: 0.75em; color: var(--text-muted); margin-top: 6px; padding: 0 6px;">
-            <span>LOW</span><span>20</span><span>300</span><span>600</span><span>HIGH</span>
+            <span>LOW</span><span>70</span><span>140</span><span>300</span><span>HIGH</span>
         </div>
         <div class="btn-grid" style="margin-top: 20px;">
             <button class="btn-large btn-gold" onclick="logGlucoseSlider()">Log Value</button>
@@ -2082,6 +2028,16 @@
             </div>
         </details>
 
+        <details class="med-accordion">
+            <summary>Magnesium Sulfate <span class="med-summary-hint">torsades · refractory VF</span></summary>
+            <div class="med-accordion-body">
+                <div class="med-settings-row"><label>Adult dose<small>2 g IV/IO</small></label><input type="number" id="cfg-mag-adult" step="500" min="500"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Peds per kg<small>50 mg/kg</small></label><input type="number" id="cfg-mag-peds-per-kg" step="5" min="5"><span class="unit">mg/kg</span></div>
+                <div class="med-settings-row"><label>Peds max<small>Cap at 2 g</small></label><input type="number" id="cfg-mag-peds-max" step="100" min="100"><span class="unit">mg</span></div>
+                <div class="med-settings-row"><label>Concentration<small>5 g / 10 mL = 500 mg/mL</small></label><input type="number" id="cfg-mag-conc" step="50" min="50"><span class="unit">mg/mL</span></div>
+            </div>
+        </details>
+
 
         <details class="med-accordion">
             <summary>Push-Dose Epinephrine <span class="med-summary-hint">post-ROSC hypotension</span></summary>
@@ -2208,6 +2164,12 @@
             pedsPerKg: 20,
             concMgPerMl: 100                // 1 g / 10 mL
         },
+        magnesium: {                        // Magnesium Sulfate — torsades / refractory VF
+            adultDoseMg: 2000,              // 2 g IV/IO
+            pedsPerKg: 50,                  // 50 mg/kg
+            pedsMaxMg: 2000,                // cap at 2 g
+            concMgPerMl: 500                // 5 g / 10 mL = 500 mg/mL
+        },
         pushEpi: {                          // Push-dose epinephrine — post-ROSC hypotension
             pedsMlPerKg: 0.1,
             pedsMaxMl: 1
@@ -2291,40 +2253,6 @@
         });
     }
 
-    // --- UI Mode: Normal vs Simple ("Basic") ---
-    // Simple mode abstracts the dashboard to CPR / Pulse Check / Epi / Defib for lay
-    // rescuers. It only flips a body class (CSS does the showing/hiding) plus persists
-    // the choice, so it can be toggled before a code or carried across sessions.
-    // BLS = simple (basics only), ALS = full advanced view.
-    let simpleMode = false;
-    function applySimpleModeClass() {
-        document.body.classList.toggle('simple-mode', simpleMode);
-        // Sliding switch: thumb sits under 🚒 (BLS, left) or 🚑 (ALS, right); active icon lights up.
-        const btn = document.getElementById('btn-mode-toggle');
-        if (btn) {
-            const thumb = btn.querySelector('.mode-seg-thumb');
-            if (thumb) thumb.style.transform = simpleMode ? 'translateX(0)' : 'translateX(36px)';
-            const activeMode = simpleMode ? 'bls' : 'als';
-            btn.querySelectorAll('.mode-seg-opt').forEach(o => o.classList.toggle('active', o.dataset.mode === activeMode));
-            btn.setAttribute('aria-checked', String(!simpleMode)); // checked = ALS
-        }
-    }
-    function loadUiMode() {
-        let m = 'normal';
-        try { m = localStorage.getItem('uiMode') || 'normal'; } catch (_) {}
-        simpleMode = (m === 'simple');
-        applySimpleModeClass();
-    }
-    function setUiMode(mode) {
-        simpleMode = (mode === 'simple');
-        try { localStorage.setItem('uiMode', simpleMode ? 'simple' : 'normal'); } catch (_) {}
-        applySimpleModeClass();
-        showToast(simpleMode ? 'BLS mode — basics only' : 'ALS mode — full view');
-    }
-    function toggleUiMode() {
-        setUiMode(simpleMode ? 'normal' : 'simple');
-    }
-
     function openSettings() {
         // Reflect current theme in the picker
         let cur = 'auto';
@@ -2376,6 +2304,11 @@
         ['cfg-cal-adult',           'calcium.adultDoseMg'],
         ['cfg-cal-peds-per-kg',     'calcium.pedsPerKg'],
         ['cfg-cal-conc',            'calcium.concMgPerMl'],
+        // Magnesium
+        ['cfg-mag-adult',           'magnesium.adultDoseMg'],
+        ['cfg-mag-peds-per-kg',     'magnesium.pedsPerKg'],
+        ['cfg-mag-peds-max',        'magnesium.pedsMaxMg'],
+        ['cfg-mag-conc',            'magnesium.concMgPerMl'],
         // Push-Dose Epi
         ['cfg-pepi-peds-per-kg',    'pushEpi.pedsMlPerKg'],
         ['cfg-pepi-peds-max',       'pushEpi.pedsMaxMl'],
@@ -2573,7 +2506,6 @@
     window.onload = async () => {
         // Apply user preferences FIRST so the UI never flashes the wrong theme.
         loadThemePreference();
-        loadUiMode();
         loadMedConfig();
         buildHTList();
         loadState();
@@ -2790,7 +2722,6 @@
         document.getElementById('btn-transport').classList.remove('hidden');
         document.getElementById('btn-undo').classList.remove('hidden');  // Now safe to expose Undo
         document.getElementById('btn-log').classList.remove('hidden');   // Code Log accessible from the top bar
-        document.getElementById('btn-mode-toggle').classList.remove('hidden'); // BLS/ALS toggle
         document.getElementById('btn-archive').classList.add('hidden'); // No accidental archive opens during a code
         
         if(state.isPediatric) {
@@ -2870,10 +2801,11 @@
         const cL   = medConfig.lidocaine;
         const cBi  = medConfig.bicarbonate;
         const cCa  = medConfig.calcium;
+        const cMg  = medConfig.magnesium;
         const cPe  = medConfig.pushEpi;
         const cDf  = medConfig.defib;
         const cFl  = medConfig.fluids;
-        
+
         const epiMg = parseFloat(Math.min(w * cE.pedsPerKg, cE.pedsMaxMg).toFixed(2));
         const epiMl = parseFloat((epiMg / cE.concMgPerMl).toFixed(1));
         const lido1Mg = parseFloat((w * cL.pedsFirstPerKg).toFixed(1));
@@ -2886,6 +2818,12 @@
         const bicarbMl = parseFloat((bicarbMeq / cBi.concMEqPerMl).toFixed(1));
         const calMg = parseFloat((w * cCa.pedsPerKg).toFixed(0));
         const calMl = parseFloat((calMg / cCa.concMgPerMl).toFixed(1));
+        const magMg = parseFloat(Math.min(w * cMg.pedsPerKg, cMg.pedsMaxMg).toFixed(0));
+        const magMl = parseFloat((magMg / cMg.concMgPerMl).toFixed(1));
+
+        // i-gel supraglottic airway size by weight (manufacturer chart):
+        // 1: 2–5 kg · 1.5: 5–12 kg · 2: 10–25 kg · 2.5: 25–35 kg · 3: 30–60 kg
+        const igelSize = w <= 5 ? '1' : w <= 12 ? '1.5' : w <= 25 ? '2' : w <= 35 ? '2.5' : '3';
 
         // Defib values use configurable J/kg steps with a J ceiling. The 3rd+ shock label
         // spans the PALS range (3rd-J to 10 J/kg per AHA) but defaults to the configured value.
@@ -2901,6 +2839,7 @@
         const lido2Rule  = `${cL.pedsSubsequentPerKg} mg/kg`;
         const bicarbRule = `${cBi.pedsPerKg} mEq/kg`;
         const calRule    = `${cCa.pedsPerKg} mg/kg · ${cCa.concMgPerMl} mg/mL`;
+        const magRule    = `${cMg.pedsPerKg} mg/kg · max ${cMg.pedsMaxMg} mg`;
         const fluidsRule = `${cFl.pedsBolusMlPerKg} mL/kg`;
         const pEpiRule   = `max ${cPe.pedsMaxMl} mL`;
 
@@ -2914,8 +2853,10 @@
                 <tr><td><strong>Lido 2nd+</strong><br><span class="ped-mini">${lido2Rule}</span></td><td>${lido2Mg} mg</td><td><strong>${lido2Ml} mL</strong></td></tr>
                 <tr><td><strong>Bicarb</strong><br><span class="ped-mini">${bicarbRule}</span></td><td>${bicarbMeq} mEq</td><td><strong>${bicarbMl} mL</strong></td></tr>
                 <tr><td><strong>CaCl</strong><br><span class="ped-mini">${calRule}</span></td><td>${calMg} mg</td><td><strong>${calMl} mL</strong></td></tr>
+                <tr><td><strong>Mag</strong><br><span class="ped-mini">${magRule}</span></td><td>${magMg} mg</td><td><strong>${magMl} mL</strong></td></tr>
                 <tr><td><strong>Fluid Bolus</strong><br><span class="ped-mini">${fluidsRule}</span></td><td>—</td><td><strong>${fluids} mL</strong></td></tr>
                 <tr><td><strong>Push Epi</strong><br><span class="ped-mini">${pEpiRule}</span></td><td>—</td><td><strong>${pEpiMl} mL</strong></td></tr>
+                <tr><td colspan="2"><strong>i-gel Airway</strong><br><span class="ped-mini">by weight chart</span></td><td><strong>Size ${igelSize}</strong></td></tr>
                 <tr class="ped-dose-defib"><td colspan="3"><strong>Defib (J):</strong> 1st ${defib1} · 2nd ${defib2} · 3rd+ ${defib3}–${defib10}</td></tr>
             </table>
         `;
@@ -3143,9 +3084,6 @@
             let aw = `${state.airway.type} size ${state.airway.size}`;
             if (state.airway.type === 'ETT' && state.airway.depth) aw += ` @ ${state.airway.depth} cm`;
             line(aw);
-            if (state.airway.confirms && state.airway.confirms.length) {
-                line(`Confirmed: ${state.airway.confirms.join(', ')}`);
-            }
         }
 
         // === 8. VASCULAR ACCESS ===
@@ -3387,7 +3325,7 @@
             autoTickRoscChecklist();
             // Prompt the team for the underlying ROSC rhythm — this auto-fills the 12-Lead.
             // Skipped in Simple mode (lay rescuers don't interpret rhythms).
-            if (!simpleMode) setTimeout(() => openModal('modal-rosc-rhythm'), 300);
+            setTimeout(() => openModal('modal-rosc-rhythm'), 300);
         }
 
         // --- Pulse check complete: CPR resumes automatically ---
@@ -3440,8 +3378,6 @@
         document.getElementById('card-epi').classList.remove('hidden');
         // Lido card is always visible during ARREST (like Epi) — show it regardless of dose state.
         document.getElementById('card-lido').classList.remove('hidden');
-        // Simple-mode defib card is also arrest-only — re-show it (CSS keeps it hidden in Normal mode).
-        document.getElementById('card-defib-simple')?.classList.remove('hidden');
         document.getElementById('card-etco2').classList.remove('hidden');
         // Push-dose epi is a post-ROSC therapy — stop its timer on re-arrest.
         state.pushEpiActive = false;
@@ -3453,7 +3389,10 @@
 
         document.querySelectorAll('.checklist-btn').forEach(btn => {
             btn.classList.remove('completed');
-            btn.querySelector('span').innerText = '';
+            // Clear the timestamp span only. chk-sbp's first span holds the "90" target, so
+            // prefer its dedicated .ts-span and never wipe the target value.
+            const ts = btn.querySelector('.ts-span') || btn.querySelector('span');
+            if (ts) ts.innerText = '';
         });
         // btn-versed-yes was removed from ROSC card; Versed is now logged only via Base Contact orders
         const _bvy_reset = document.getElementById('btn-versed-yes');
@@ -3519,34 +3458,43 @@
     }
 
     function handleLidoClick() {
+        closeModal('modal-interventions');
+        const block = document.getElementById('adult-lido-weight-block');
+        const pedsNote = document.getElementById('adult-lido-peds-weight');
         if (state.isPediatric) {
-            // Peds — weight already known from Broselow, route through same modal pattern
-            // but skip the weight prompt
-            closeModal('modal-interventions');
-            // Reuse the adult-lido modal but force the peds path
-            document.getElementById('adult-lido-weight').value = state.pediatricWeight || '';
-            updateLbsDisplay();
-            refreshAdultLidoView();
-            openModal('modal-adult-lido');
+            // Peds weight comes from Broselow — hide the lbs slider, show the known weight.
+            block.classList.add('hidden');
+            pedsNote.classList.remove('hidden');
+            pedsNote.textContent = state.pediatricWeight ? `Weight: ${state.pediatricWeight} kg (Broselow)` : 'Set Broselow weight first';
         } else {
-            closeModal('modal-interventions');
-            document.getElementById('adult-lido-weight').value = state.adultWeight || '';
+            block.classList.remove('hidden');
+            pedsNote.classList.add('hidden');
+            // Pre-fill the lbs slider from any stored weight (kg → lbs), clamped to 80–280.
+            const slider = document.getElementById('adult-lido-weight-slider');
+            if (state.adultWeight) {
+                slider.value = Math.max(80, Math.min(280, Math.round(state.adultWeight * 2.205)));
+            }
             updateLbsDisplay();
-            refreshAdultLidoView();
-            openModal('modal-adult-lido');
         }
+        refreshAdultLidoView();
+        openModal('modal-adult-lido');
+    }
+
+    // Single source of truth for the patient weight (kg) the lido calculator uses.
+    // Adult: read the lbs slider and convert to kg. Peds: use the Broselow weight.
+    function lidoWeightKg() {
+        if (state.isPediatric) return state.pediatricWeight || 0;
+        const lbs = parseFloat(document.getElementById('adult-lido-weight-slider').value);
+        return (lbs && lbs > 0) ? lbs / 2.205 : 0;
     }
 
     function updateLbsDisplay() {
-        const kg = parseFloat(document.getElementById('adult-lido-weight').value);
+        const slider = document.getElementById('adult-lido-weight-slider');
         const display = document.getElementById('adult-lido-lbs-display');
-        if (!display) return;
-        if (kg && kg > 0) {
-            const lbs = Math.round(kg * 2.205);
-            display.textContent = `≈ ${lbs} lbs (cross-check)`;
-        } else {
-            display.textContent = '— lbs (for cross-check)';
-        }
+        if (!slider || !display) return;
+        const lbs = parseFloat(slider.value);
+        const kg = Math.round(lbs / 2.205);
+        display.textContent = `${lbs} lbs (≈ ${kg} kg)`;
     }
 
     /**
@@ -3558,7 +3506,7 @@
      * Max cumulative for both: 3 mg/kg
      */
     function getNextLidoDose() {
-        const w = parseFloat(document.getElementById('adult-lido-weight').value);
+        const w = lidoWeightKg();
         if (!w || w <= 0) return null;
         const cL = medConfig.lidocaine;
         const isFirst = state.lidoDoses === 0;
@@ -3572,7 +3520,7 @@
     }
 
     function refreshAdultLidoView() {
-        const w = parseFloat(document.getElementById('adult-lido-weight').value);
+        const w = lidoWeightKg();
         const dosesGiven = state.lidoDoses;
         const totalMg = state.lidoTotalMg || 0;
         const maxPerKg = medConfig.lidocaine.cumulativeMaxPerKg;
@@ -3613,7 +3561,7 @@
     }
 
     function logAdultLido() {
-        const w = parseFloat(document.getElementById('adult-lido-weight').value);
+        const w = lidoWeightKg();
         if (!w) return;
         const next = getNextLidoDose();
         if (!next) return;
@@ -3642,16 +3590,6 @@
         if (w && state.lidoTotalMg >= w * maxPerKg) {
             showToast(`⚠️ Max lido (${maxPerKg} mg/kg) reached`, 4000);
         }
-    }
-
-    // BLS-mode defib: logs a shock without the Joules prompt used in ALS mode. State updates
-    // mirror the Defibrillation branch of logValuePrompt (shock count + time-to-first-defib)
-    // so the report/undo stay consistent.
-    function logAedShock() {
-        state.totalShocks = (state.totalShocks || 0) + 1;
-        if (state.firstDefibAtTotalTime == null) state.firstDefibAtTotalTime = state.totalTime;
-        logAction('Defibrillated / Shock Delivered');
-        showToast('Shock logged ✓');
     }
 
     function cancelLido() {
@@ -3848,7 +3786,7 @@
         if (!btn.classList.contains('completed')) {
             btn.classList.add('completed');
             const ts = getFormattedTime();
-            btn.querySelector('span').innerText = `(${ts})`;
+            (btn.querySelector('.ts-span') || btn.querySelector('span')).innerText = `(${ts})`;
             state.checklistsCompleted.push({ id: id, text: text, ts: ts });
             logAction(`Protocol Check: ${text}`);
         }
@@ -4097,9 +4035,7 @@
     function logIntubation(isSuccess) {
         const duration = state.totalTime - intubStartTime;
         const cprPause = document.getElementById('intub-cpr-pause').checked ? "Yes" : "No";
-        const confirmsArr = Array.from(document.querySelectorAll('.chip-confirm.active')).map(el => el.innerText);
-        const confirms = confirmsArr.join(', ');
-        
+
         // Increment FIRST so the attempt number in the log matches what the banner showed.
         // undoLastLog() decrements this if the user undoes the entry.
         state.intubAttempts = (state.intubAttempts || 0) + 1;
@@ -4117,13 +4053,11 @@
                 size = document.querySelector('.chip-igel-size.active')?.innerText || '?';
                 logStr += `Size: ${size}. `;
             }
-            logStr += `Confirmed via: ${confirms || 'Not specified'}. `;
             // Store in clinical state for handoff
             state.airway = {
                 type: airwayMode,
                 size,
                 depth,
-                confirms: confirmsArr,
                 time: getFormattedTime()
             };
         }
@@ -4176,11 +4110,13 @@
             // PALS doses (peds) — every value sourced from medConfig
             if (type === 'Bicarbonate') input.value = parseFloat((w * medConfig.bicarbonate.pedsPerKg).toFixed(1));
             if (type === 'Calcium')     input.value = parseFloat((w * medConfig.calcium.pedsPerKg).toFixed(1));
+            if (type === 'Magnesium')   input.value = parseFloat(Math.min(w * medConfig.magnesium.pedsPerKg, medConfig.magnesium.pedsMaxMg).toFixed(0));
         }
         else {
             // ADULT default doses — all sourced from medConfig
             if (type === 'Bicarbonate') input.value = medConfig.bicarbonate.adultDoseMEq;
             if (type === 'Calcium')     input.value = medConfig.calcium.adultDoseMg;
+            if (type === 'Magnesium')   input.value = medConfig.magnesium.adultDoseMg;
             if (type === 'Glucose')     input.value = '';        // No default — measured
             if (type === 'ETCO2')       input.value = '';        // No default — measured
         }
@@ -4224,7 +4160,7 @@
             }
             logText = `Defibrillated / Shock Delivered${suffix}`;
         }
-        else if (['Bicarbonate', 'Calcium'].includes(type)) {
+        else if (['Bicarbonate', 'Calcium', 'Magnesium'].includes(type)) {
             logText = `Administered ${type}${suffix}`;
         }
         else if (type === 'ETCO2') {
@@ -4424,7 +4360,8 @@
                 const btn = document.getElementById(lastCheck.id);
                 if(btn) {
                     btn.classList.remove('completed');
-                    btn.querySelector('span').innerText = '';
+                    const ts = btn.querySelector('.ts-span') || btn.querySelector('span');
+                    if (ts) ts.innerText = '';
                 }
             }
         }
@@ -4528,7 +4465,6 @@
             const ccf = calcCCF();
             set('ms-ccf', ccf == null ? '--%' : `${ccf}%`);
         }
-        set('ms-etco2', state.lastEtco2 != null ? state.lastEtco2 : '--');
     }
 
     function openCodeLog() {
@@ -4887,8 +4823,9 @@
         if (v <= 19)        { ctx = 'Off-scale low'; color = 'var(--alert-red)'; }
         else if (v >= 601)  { ctx = 'Off-scale high'; color = 'var(--alert-red)'; }
         else if (v < 70)    { ctx = '⚠️ Hypoglycemia — consider dextrose'; color = 'var(--alert-red)'; }
-        else if (v <= 180)  { ctx = '✓ In range'; color = 'var(--primary-blue)'; }
-        else                { ctx = 'Hyperglycemia'; color = '#B8860B'; }
+        else if (v <= 140)  { ctx = '✓ Normal'; color = '#2e9e44'; }
+        else if (v <= 300)  { ctx = 'Elevated'; color = '#B8860B'; }
+        else                { ctx = '⚠️ Severe hyperglycemia'; color = 'var(--alert-red)'; }
         disp.style.color = color;
         const ce = document.getElementById('glucose-slider-context');
         ce.textContent = ctx; ce.style.color = color;
@@ -4976,7 +4913,6 @@
         document.getElementById('btn-end-code-top')?.classList.add('hidden');
         document.getElementById('btn-undo')?.classList.add('hidden');
         document.getElementById('btn-log')?.classList.add('hidden');
-        document.getElementById('btn-mode-toggle')?.classList.add('hidden');
         // Code is over — re-expose Archive so saved cases stay reachable from this screen.
         document.getElementById('btn-archive')?.classList.remove('hidden');
         // Wire up the Share button (uses native share sheet — covers iMessage, Mail, etc.)
@@ -5129,7 +5065,6 @@
             document.getElementById('btn-end-code-top').classList.remove('hidden');
             document.getElementById('btn-undo').classList.remove('hidden');
             document.getElementById('btn-log').classList.remove('hidden');
-            document.getElementById('btn-mode-toggle').classList.remove('hidden');
             document.getElementById('btn-archive').classList.add('hidden');
 
             if (state.isPediatric) {
@@ -5696,7 +5631,43 @@
         const slider = document.getElementById('etco2-slider');
         slider.value = start;
         updateEtco2Slider();
+        renderEtco2Trend();
         openModal('modal-etco2-slider');
+    }
+
+    // Draw a small discrete trend graph of every ETCO2 recorded this code. Plots one dot per
+    // entry connected by a line; the 35–45 target band is shaded. SVG is built from numeric
+    // history only, so innerHTML is safe here.
+    function renderEtco2Trend() {
+        const wrap = document.getElementById('etco2-trend');
+        if (!wrap) return;
+        const hist = (state.etco2History || []).map(Number).filter(n => !Number.isNaN(n));
+        if (hist.length < 1) {
+            wrap.innerHTML = `<div style="color:var(--text-muted); font-size:0.8em; text-align:center; padding:10px 0;">No values recorded yet</div>`;
+            return;
+        }
+        const W = 100, H = 40, MAXV = 80; // viewBox units; ETCO2 plotted 0–80 mmHg
+        const yOf = v => H - (Math.max(0, Math.min(MAXV, v)) / MAXV) * H;
+        const xOf = i => hist.length === 1 ? W / 2 : (i / (hist.length - 1)) * W;
+        // Target band 35–45 shaded
+        const bandTop = yOf(45), bandH = yOf(35) - yOf(45);
+        const pts = hist.map((v, i) => `${xOf(i).toFixed(1)},${yOf(v).toFixed(1)}`).join(' ');
+        const dots = hist.map((v, i) => {
+            const inRange = v >= 35 && v <= 45;
+            const color = v < 10 ? 'var(--alert-red)' : inRange ? '#2e9e44' : '#B8860B';
+            return `<circle cx="${xOf(i).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="2.4" fill="${color}" />`;
+        }).join('');
+        const last = hist[hist.length - 1];
+        wrap.innerHTML =
+            `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:70px; display:block;">
+                <rect x="0" y="${bandTop.toFixed(1)}" width="${W}" height="${bandH.toFixed(1)}" fill="rgba(46,158,68,0.15)" />
+                <polyline points="${pts}" fill="none" stroke="var(--primary-blue)" stroke-width="1.2" stroke-linejoin="round" />
+                ${dots}
+            </svg>
+            <div style="display:flex; justify-content:space-between; font-size:0.72em; color:var(--text-muted); margin-top:2px;">
+                <span>${hist.length} reading${hist.length === 1 ? '' : 's'}</span>
+                <span>latest: <strong style="color:var(--text-main);">${last} mmHg</strong></span>
+            </div>`;
     }
     
     function updateEtco2Slider() {
