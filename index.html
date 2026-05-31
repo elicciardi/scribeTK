@@ -122,6 +122,55 @@
         font-size: 0.85em;
         min-height: 40px;
     }
+    /* Compact square icon buttons (Log, Undo) — keep the in-code bar from wrapping. */
+    .top-bar .btn-icon {
+        padding: 8px;
+        min-width: 42px;
+        font-size: 1.15em;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    /* BLS/ALS sliding switch — 🚒 fire (BLS) ⇄ 🚑 medic (ALS). A thumb slides under the active icon. */
+    .mode-seg {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 3px;
+        border: none;
+        border-radius: 16px;
+        background: var(--gray-light);
+        cursor: pointer;
+        min-height: 40px;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .mode-seg-opt {
+        position: relative;
+        z-index: 1;
+        width: 34px;
+        text-align: center;
+        font-size: 1.2em;
+        line-height: 1;
+        padding: 4px 0;
+        opacity: 0.4;
+        filter: grayscale(0.6);
+        transition: opacity 0.2s, filter 0.2s;
+    }
+    .mode-seg-opt.active { opacity: 1; filter: none; }
+    .mode-seg-thumb {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 34px;
+        height: calc(100% - 6px);
+        border-radius: 13px;
+        background: var(--card-bg);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+        transition: transform 0.2s ease;
+        z-index: 0;
+    }
     /* On very small phones the top bar fits across by shrinking further */
     @media (max-width: 480px) {
         .top-bar { gap: 4px; }
@@ -580,6 +629,27 @@
 
     .hidden { display: none !important; }
 
+    /* --- Simple ("Basic") mode --------------------------------------------------
+       For lay rescuers / volunteer firefighters without EMT training. Collapses the
+       dashboard to four essentials: Code Clock + CPR, Pulse Check, Epinephrine, Defib.
+       Elements tagged `adv-only` are hidden; `simple-only` / `simple-only-inline`
+       elements appear. `.hidden` (with !important) still wins, so phase-based hiding
+       (e.g. arrest-only cards during ROSC) keeps working. Default mode is Normal. */
+    .simple-only, .simple-only-inline { display: none; }
+    body.simple-mode .simple-only { display: block; }
+    body.simple-mode .simple-only-inline { display: inline; }
+    body.simple-mode .adv-only { display: none !important; }
+
+    /* Sticky Code Clock — keeps the time + CPR control on screen while scrolling timers. */
+    #cpr-card { position: sticky; top: 0; z-index: 50; box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+
+    /* Last-action line flashes briefly when a new entry is logged (at-a-glance confirm). */
+    @keyframes ribbon-flash { from { background: var(--accent-gold); color: #1a1a1a; } to { background: var(--input-bg); } }
+    .last-action-ribbon.flash { animation: ribbon-flash 0.9s ease-out; }
+
+    /* Down-time slider */
+    .downtime-slider { width: 100%; margin: 6px 0 0; accent-color: var(--primary-blue); }
+
     /* Toast for transient feedback (undo, copy confirm, etc.) */
     .toast {
         position: fixed;
@@ -812,14 +882,24 @@
 
 <div class="top-bar">
     <div style="display:flex; gap:6px; flex-wrap: wrap;">
-        <button class="btn-small blue hidden" id="btn-pt-info" onclick="openModal('modal-demographics')">PT Info</button>
+        <!-- PT Info is neutral (secondary); Transport (gold) and End Code (red) carry the
+             color so the eye lands on the workflow-critical actions, not a wall of buttons. -->
+        <button class="btn-small hidden adv-only" id="btn-pt-info" onclick="openModal('modal-demographics')">PT Info</button>
         <button class="btn-small gold hidden" id="btn-transport" onclick="handleTransport()">Transport</button>
         <button class="btn-small danger hidden" id="btn-end-code-top" onclick="openModal('modal-end')">End Code</button>
     </div>
     <div style="margin-left: auto; display:flex; gap:5px;">
-        <button class="btn-small blue hidden" id="btn-log" onclick="openCodeLog()">📋 Log<span id="btn-log-count" class="log-count-badge"></span></button>
+        <!-- BLS/ALS mode toggle — sliding switch: 🚒 fire (BLS) ⇄ 🚑 medic (ALS). Tap to switch.
+             Visible in both modes so a medic can escalate a layperson's BLS code to ALS in-code. -->
+        <button class="mode-seg hidden" id="btn-mode-toggle" onclick="toggleUiMode()" role="switch" aria-label="Toggle BLS (fire) / ALS (medic) view" title="BLS 🚒 / ALS 🚑">
+            <span class="mode-seg-thumb"></span>
+            <span class="mode-seg-opt" data-mode="bls">🚒</span>
+            <span class="mode-seg-opt" data-mode="als">🚑</span>
+        </button>
+        <!-- Log + Undo collapse to icons in-code to keep the bar from wrapping. -->
+        <button class="btn-small btn-icon hidden" id="btn-log" onclick="openCodeLog()" aria-label="Code Log" title="Code Log">📋<span id="btn-log-count" class="log-count-badge"></span></button>
+        <button class="btn-small btn-icon hidden" id="btn-undo" onclick="undoLastLog()" aria-label="Undo last action" title="Undo">↩</button>
         <button class="btn-small blue" id="btn-archive" onclick="openArchive()">Archive</button>
-        <button class="btn-small hidden" id="btn-undo" onclick="undoLastLog()">Undo</button>
     </div>
 </div>
 
@@ -836,10 +916,10 @@
 </div>
 
 <div id="main-dashboard" class="hidden">
-<div id="banner-20min" class="banner hidden">⚠️ 20 MINUTES EXCEEDED: Consider Termination Criteria</div>
+<div id="banner-20min" class="banner hidden adv-only">⚠️ 20 MINUTES EXCEEDED: Consider Termination Criteria</div>
 
 <!-- Handoff Report — appears at top after "Arrived at Receiving" tapped -->
-<div id="handoff-summary" class="card hidden" style="border-top-color: var(--accent-gold); margin-bottom: 15px;">
+<div id="handoff-summary" class="card hidden adv-only" style="border-top-color: var(--accent-gold); margin-bottom: 15px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <h3 style="margin:0; color:var(--accent-gold); border:none; padding:0;">📋 Handoff Report</h3>
         <button class="btn-small blue" onclick="shareReport(document.getElementById('handoff-summary-body').textContent)">Share</button>
@@ -857,16 +937,14 @@
                 <span id="clock-master-text">00:00</span>
             </div>
             <div id="pause-warning" class="hidden" style="text-align:center; color:var(--alert-red); font-weight:bold; margin-bottom:10px;">CPR PAUSED > 10 SECONDS</div>
-            <div id="lucas-status" class="hidden" style="text-align:center; color:var(--primary-blue); font-weight:bold; margin-bottom:10px;">LUCAS Active</div>
-            
-            <div class="btn-grid" id="cpr-buttons-container">
+
+            <div id="cpr-buttons-container" style="display:grid; grid-template-columns:1fr;">
                 <button class="btn-large btn-gray hidden" id="btn-cpr" onclick="toggleCPR()">START CPR</button>
-                <button class="btn-large btn-gray hidden" id="btn-lucas" onclick="toggleLucas()">LUCAS</button>
             </div>
         </div>
 
         <!-- Pediatric Cheat Card — two states: (1) prompt for Broselow weight, (2) doses display -->
-        <div class="card ped-trim hidden" id="ped-cheat-card" style="margin-top: 10px;">
+        <div class="card ped-trim hidden adv-only" id="ped-cheat-card" style="margin-top: 10px;">
             <!-- State 1: No weight set — pulsing prompt button -->
             <div id="ped-weight-prompt">
                 <button class="btn-large btn-full ped-pulse" id="btn-set-broselow" onclick="openModal('modal-broselow')" style="background:#E91E63; color:white;">
@@ -887,11 +965,17 @@
         </div>
 
         <div class="btn-grid hidden" id="arrest-timers">
+            <!-- ROSC clock — shown only in ROSC (rosc-only-card), sits at the top beside the
+                 push-dose-epi timer. Replaces the code clock during ROSC. -->
+            <div class="card rosc-only-card hidden" id="card-rosc-clock" style="border-top:4px solid var(--primary-blue);">
+                <div class="timer-label" style="color:var(--primary-blue); font-weight:bold;">ROSC Time</div>
+                <div class="time-display" id="clock-rosc">00:00</div>
+            </div>
             <div class="card gold-trim arrest-only-card" id="card-rhythm">
-                <div class="timer-label">Next <strong style="color:var(--text-main);">RHYTHM CHECK</strong></div>
+                <div class="timer-label">Next <strong style="color:var(--text-main);"><span class="adv-only">RHYTHM CHECK</span><span class="simple-only-inline">PULSE CHECK</span></strong></div>
                 <div class="time-display" id="clock-rhythm">--:--</div>
                 <div class="time-overdue hidden" id="rhythm-overdue"></div>
-                <button class="btn-large btn-full" onclick="initiateRhythmCheck()">RHYTHM CHECK</button>
+                <button class="btn-large btn-full" onclick="initiateRhythmCheck()"><span class="adv-only">RHYTHM CHECK</span><span class="simple-only-inline">PULSE CHECK</span></button>
             </div>
             <div class="card gold-trim arrest-only-card" id="card-epi">
                 <div class="timer-label">Next <strong style="color:var(--text-main);">EPINEPHRINE</strong></div>
@@ -901,39 +985,41 @@
             </div>
             <!-- ETCO2 lives inside arrest-timers so it shares the 2-col card sizing, but doesn't
                  get the .arrest-only-card class so it stays visible when arrest cards are hidden in ROSC. -->
-            <div class="card etco2-trim" id="card-etco2">
+            <div class="card etco2-trim adv-only" id="card-etco2">
                 <div class="timer-label">Next <strong style="color:var(--text-main);">ETCO2 CHECK</strong></div>
                 <div class="time-display" id="clock-etco2">2:00</div>
                 <div class="time-overdue-etco2 hidden" id="etco2-overdue"></div>
                 <button class="btn-large btn-full" onclick="openEtco2Slider()">RECORD ETCO2</button>
             </div>
-            <div class="card gold-trim arrest-only-card" id="card-lido">
+            <div class="card gold-trim arrest-only-card adv-only" id="card-lido">
                 <button class="btn-small danger" onclick="cancelLido()" aria-label="Cancel Lidocaine Timer" style="position:absolute; top:4px; right:4px; padding:2px 6px; font-size:0.7em; line-height:1; min-height:24px; min-width:24px;">×</button>
                 <div class="timer-label">Next <strong style="color:var(--text-main);">LIDOCAINE</strong></div>
                 <div class="time-display" id="clock-lido">--:--</div>
                 <div class="time-overdue hidden" id="lido-overdue"></div>
                 <button class="btn-large btn-full" onclick="handleLidoClick()">GIVE LIDO</button>
             </div>
-        </div>
-
-        <div class="card hidden red-trim" id="card-push-epi" style="margin-top: 10px;">
-            <!-- X button cancels the timer (matches lido card pattern). Card itself stays hidden after cancel. -->
-            <button class="btn-small danger" onclick="cancelPushEpi()" aria-label="Cancel Push Dose Epi Timer" style="position:absolute; top:4px; right:4px; padding:2px 6px; font-size:0.7em; line-height:1; min-height:24px; min-width:24px;">×</button>
-            <div class="timer-label">Next Push Dose Epi</div>
-            <div id="push-epi-dose-label" class="hidden" style="text-align:center; color:var(--primary-blue); font-weight:bold; font-size:0.95em; margin-bottom:5px;"></div>
-            <div class="time-display" id="clock-push-epi">1:00</div>
-            <!-- Overdue counter shown after timer hits 0 (same pattern as epi/lido). -->
-            <div class="time-overdue hidden" id="push-epi-overdue"></div>
-            <button class="btn-large btn-full" onclick="logPushEpi()">GIVE PUSH DOSE EPI</button>
+            <!-- BLS-only Defib card. One-tap shock log (no Joules prompt). Hidden in ALS mode,
+                 where defib goes through the rhythm-check / Interventions flow with an energy value. -->
+            <div class="card gold-trim arrest-only-card simple-only" id="card-defib-simple">
+                <div class="timer-label">Next <strong style="color:var(--text-main);">DEFIB</strong></div>
+                <button class="btn-large btn-full btn-red" onclick="logAedShock()">SHOCK DELIVERED</button>
+            </div>
+            <!-- Push-dose epi — ROSC-only, sits beside the ROSC clock and stays the whole time.
+                 Timer shows --:-- until the first dose, then counts the 1-min redose interval. -->
+            <div class="card red-trim rosc-only-card adv-only hidden" id="card-push-epi">
+                <div class="timer-label">Push Dose Epi</div>
+                <div id="push-epi-dose-label" class="hidden" style="text-align:center; color:var(--primary-blue); font-weight:bold; font-size:0.95em; margin-bottom:5px;"></div>
+                <div class="time-display" id="clock-push-epi">--:--</div>
+                <div class="time-overdue hidden" id="push-epi-overdue"></div>
+                <button class="btn-large btn-full" onclick="logPushEpi()">GIVE PUSH DOSE EPI</button>
+            </div>
         </div>
 
         <div class="card hidden" id="rosc-timers">
-            <div class="timer-label" style="color:var(--primary-blue); font-weight:bold;">ROSC Time</div>
-            <div class="time-display" id="clock-rosc">00:00</div>
             <button class="btn-large btn-full btn-red" onclick="reArrest()" style="margin-bottom: 15px;">RE-ARREST</button>
-            
-            <h4 style="margin-bottom:5px; margin-top:0;">ROSC Checklist</h4>
-            <div style="background: var(--input-bg); border: 1px solid var(--border-color); padding:10px; border-radius: 8px; margin-bottom: 10px;">
+
+            <h4 class="adv-only" style="margin-bottom:5px; margin-top:0;">ROSC Checklist</h4>
+            <div class="adv-only" style="background: var(--input-bg); border: 1px solid var(--border-color); padding:10px; border-radius: 8px; margin-bottom: 10px;">
                 <!-- Each checklist item is now ACTION-LAUNCHING: if not yet done, tapping opens
                      the relevant entry screen so the provider can complete it. Once done, the
                      item auto-ticks via autoTickRoscChecklist() (called from logAction).
@@ -943,15 +1029,14 @@
                 <button class="checklist-btn" id="chk-vent" onclick="openEtco2Slider()">Ventilating to ETCO2 35-45 <span></span></button>
                 <button class="checklist-btn rosc-adult-only" id="chk-tube" onclick="openIntubation()">Patient Intubated <span></span></button>
                 <button class="checklist-btn rosc-peds-only hidden" id="chk-airway" onclick="openIntubation()">Advanced Airway <span></span></button>
-                <button class="checklist-btn" id="chk-glucose" onclick="openValuePrompt('Glucose Value', 'Glucose', 'mg/dL')">Check Blood Glucose <span></span></button>
-                <button class="checklist-btn" id="chk-sbp" onclick="openRoscVitals()">Maintain SBP > <span id="sbp-target">90</span> <span class="ts-span"></span></button>
-                <button class="btn-small gold" id="btn-push-epi-rosc" style="width:100%; padding:10px; margin-top:5px;" onclick="logPushEpi()">+ Start Push Dose Epi Timer</button>
+                <button class="checklist-btn" id="chk-glucose" onclick="openGlucoseSlider()">Check Blood Glucose <span></span></button>
+                <button class="checklist-btn" id="chk-sbp" onclick="toggleSbpCheck()">Maintain SBP > <span id="sbp-target">90</span> <span class="ts-span"></span></button>
             </div>
 
             <!-- Optional Vitals capture — collapsed by default. Live MAP calculation.
                  Each Log Vitals tap timestamps via logAction so post-ROSC vitals trends
                  appear in the code timeline + handoff. -->
-            <details id="rosc-vitals" style="margin-top: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px;">
+            <details id="rosc-vitals" class="adv-only" style="margin-top: 10px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px;">
                 <summary style="padding: 10px 12px; cursor: pointer; font-weight: bold; color: var(--primary-blue);">
                     📊 Record Post-ROSC Vitals
                 </summary>
@@ -982,12 +1067,7 @@
     </div>
 
     <!-- Right Column: Actions & Log -->
-    <div class="hidden" id="action-panel">
-        <div id="active-fluids-card" class="card hidden gold-trim" style="margin-bottom: 15px; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <div><strong>Fluids Infusing</strong> <br><small id="fluids-timer-display" style="color:var(--text-main);">00:00</small></div>
-            <button class="btn-small danger" onclick="completeFluids()">FLUIDS COMPLETE</button>
-        </div>
-
+    <div class="hidden adv-only" id="action-panel">
         <!-- Mini-stats strip — at-a-glance code progress -->
         <div class="mini-stats" id="mini-stats">
             <div class="mini-stat"><span class="mini-stat-label">Shocks</span><span class="mini-stat-value" id="ms-shocks">0</span></div>
@@ -1008,7 +1088,6 @@
         </div>
     </div>
 </div>
-</div>
 
 <!-- Code Complete screen — shown after report is generated, replaces auto-reload behavior -->
 <div id="complete-screen" class="complete-screen hidden">
@@ -1016,10 +1095,8 @@
     <p style="color:var(--text-muted); margin-top:0;">Your case has been saved to the archive. You can share it now or anytime later from the Archive button.</p>
     <pre id="complete-report-text"></pre>
     <div class="btn-grid" style="margin-top: 12px;">
-        <button class="btn-large btn-gold btn-full" id="complete-share-btn">Share / Send</button>
-        <button class="btn-large" onclick="copyReportToClipboard(document.getElementById('complete-report-text').textContent)">Copy to Clipboard</button>
-        <button class="btn-large" onclick="emailReport(document.getElementById('complete-report-text').textContent)">Email</button>
-        <button class="btn-large" onclick="smsReport(document.getElementById('complete-report-text').textContent)">Text Message</button>
+        <button class="btn-large btn-gold btn-full" id="complete-share-btn">Share</button>
+        <button class="btn-large btn-full" onclick="smsReport(document.getElementById('complete-report-text').textContent)">Text Message</button>
         <button class="btn-large btn-full btn-gray" onclick="returnToStart()">Return to Dashboard</button>
     </div>
 </div>
@@ -1159,38 +1236,17 @@
             <button class="chip chip-gender" id="chip-f" onclick="setGender('F')">F</button>
         </div>
 
+        <!-- Down time slider: Witnessed (0) → 1–30 min → Unknown. Replaces the old numeric
+             field + separate witnessed-status chips. -->
         <div class="input-group">
-            <label>Estimated Down Time (min, prior to arrival)</label>
-            <input type="tel" inputmode="numeric" pattern="[0-9]*" id="pt-downtime" class="text-input" placeholder="minutes">
+            <label>Estimated Down Time (prior to arrival)</label>
+            <input type="range" min="0" max="31" value="31" id="pt-downtime-slider" class="downtime-slider" oninput="updateDowntimeLabel()">
+            <div style="display:flex; justify-content:space-between; font-size:0.7em; color:var(--text-muted); margin-top:2px;">
+                <span>Witnessed</span><span>1–30 min</span><span>Unknown</span>
+            </div>
+            <div id="pt-downtime-label" style="text-align:center; font-weight:bold; color:var(--primary-blue); margin-top:6px;">Unknown</div>
         </div>
 
-        <div class="input-group">
-            <label>Witnessed Status</label>
-            <div class="chip-grid">
-                <button class="chip chip-witnessed" onclick="setWitnessed(this, 'Witnessed by EMS')">Witnessed by EMS</button>
-                <button class="chip chip-witnessed" onclick="setWitnessed(this, 'Witnessed by Bystander')">Witnessed by Bystander</button>
-                <button class="chip chip-witnessed" onclick="setWitnessed(this, 'Unwitnessed')">Unwitnessed</button>
-            </div>
-        </div>
-
-        <!-- Suspected mechanism / etiology — single-select, feeds the handoff so the team
-             can hint the receiving hospital about likely cause before arrival. -->
-        <div class="input-group">
-            <label>Suspected Etiology / Mechanism</label>
-            <div class="chip-grid">
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Cardiac / ACS')">Cardiac / ACS</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Respiratory')">Respiratory</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Trauma')">Trauma</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Hypoxic')">Hypoxic</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Toxic / Overdose')">Toxic / OD</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Metabolic / Electrolyte')">Metabolic</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Drowning')">Drowning</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Anaphylaxis')">Anaphylaxis</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Electrical')">Electrical</button>
-                <button class="chip chip-etiology" onclick="setEtiology(this, 'Unknown')">Unknown</button>
-            </div>
-        </div>
-        
         <!-- ADULT History (default) -->
         <div class="input-group adult-only" id="hx-adult-container">
             <label>Code-Relevant History</label>
@@ -1282,15 +1338,9 @@
         
         <h3>Medications</h3>
         <div class="btn-grid">
-            <button class="btn-large interv-rosc-only" onclick="openAdenosine()">Adenosine</button>
-            <button class="btn-large interv-rosc-only" onclick="openAtropine()">Atropine</button>
             <button class="btn-large" onclick="openValuePrompt('Bicarbonate Dose', 'Bicarbonate', 'mEq')">Bicarbonate</button>
             <button class="btn-large" onclick="openValuePrompt('Calcium Dose', 'Calcium', 'mg')">Calcium</button>
-            <button class="btn-large" onclick="openValuePrompt('Dextrose Dose', 'Dextrose', 'mL')">Dextrose</button>
-            <button class="btn-large" id="btn-fluids-interv" onclick="openFluidsStart()">Fluids (Start)</button>
-            <button class="btn-large" onclick="handleLidoClick()">Lidocaine</button>
-            <button class="btn-large" onclick="openValuePrompt('Magnesium Dose', 'Magnesium', 'mg')">Magnesium</button>
-            <button class="btn-large" onclick="openValuePrompt('Narcan Dose', 'Narcan', 'mg')">Narcan</button>
+            <button class="btn-large" id="btn-fluids-interv" onclick="openFluidsStart()">Fluids</button>
             <button class="btn-large btn-gold" onclick="openOtherMed()">Other Medication</button>
         </div>
 
@@ -1298,18 +1348,10 @@
         <div class="btn-grid">
             <button class="btn-large" onclick="openIntubation()">Advanced Airway</button>
             <button class="btn-large btn-blue" onclick="openBaseContact()">Base Contact</button>
-            <button class="btn-large" onclick="openBVM()">BVM</button>
-            <button class="btn-large btn-blue interv-rosc-only" onclick="openCardioversion()">Cardioversion</button>
-            <button class="btn-large" onclick="logAction('Needle Decompression'); closeModal('modal-interventions');">Needle Decompression</button>
             <button class="btn-large btn-red interv-arrest-only" onclick="openValuePrompt('Defib Energy', 'Defibrillation', 'Joules')">Defibrillation</button>
-            <button class="btn-large" onclick="logDefibPadsSimple()">Defib Pads</button>
-            <button class="btn-large" onclick="openOtherProcedureWithName('Foreign Body')">Foreign Body</button>
-            <button class="btn-large" onclick="openValuePrompt('Glucose Value', 'Glucose', 'mg/dL')">Glucose</button>
-            <button class="btn-large" onclick="openValuePrompt('ETCO2 Value', 'ETCO2', 'mmHg')">ETCO2</button>
+            <button class="btn-large" onclick="openGlucoseSlider()">Glucose</button>
             <button class="btn-large" onclick="open12Lead()">12-Lead ECG</button>
             <button class="btn-large" onclick="logAction('OG/NG Tube Placed'); closeModal('modal-interventions');">OG/NG Tube</button>
-            <button class="btn-large interv-rosc-only" onclick="openPacing()">Pacing</button>
-            <button class="btn-large" onclick="logAction('Airway Suctioned'); closeModal('modal-interventions');">Suction</button>
             <button class="btn-large" onclick="openVascular()">IV / IO</button>
             <button class="btn-large btn-gold" onclick="openOtherProcedure()">Other Procedure</button>
         </div>
@@ -1344,7 +1386,6 @@
                 <button class="chip chip-base-order" onclick="toggleChipMulti(this)">Pronounce</button>
                 <button class="chip chip-base-order" onclick="toggleChipMulti(this)">Bicarb</button>
                 <button class="chip chip-base-order" onclick="toggleChipMulti(this)">Calcium</button>
-                <button class="chip chip-base-order" onclick="toggleChipMulti(this)">Magnesium</button>
                 <button class="chip chip-base-order" onclick="toggleChipMulti(this)">Versed</button>
             </div>
         </div>
@@ -1501,13 +1542,17 @@
         <h2 id="rhythm-title">Pulse / Rhythm Check</h2>
         <p style="color:var(--alert-red); font-weight:bold; margin-bottom:15px;">CPR PAUSED FOR CHECK</p>
         
-        <p style="font-weight:bold; margin-bottom:5px;">Select Rhythm:</p>
+        <p class="adv-only" style="font-weight:bold; margin-bottom:5px;">Select Rhythm:</p>
+        <p class="simple-only" style="font-weight:bold; margin-bottom:5px;">Is there a pulse?</p>
         <div class="btn-grid">
-            <button class="btn-large btn-red" onclick="logRhythm('VFib')">VFib</button>
-            <button class="btn-large btn-red" onclick="logRhythm('pVT')">pVT</button>
-            <button class="btn-large" onclick="logRhythm('PEA')">PEA</button>
-            <button class="btn-large" onclick="logRhythm('Asystole')">Asystole</button>
-            <button class="btn-large btn-gold btn-full" onclick="logRhythm('ROSC')">ROSC Achieved</button>
+            <button class="btn-large btn-red adv-only" onclick="logRhythm('VFib')">VFib</button>
+            <button class="btn-large btn-red adv-only" onclick="logRhythm('pVT')">pVT</button>
+            <button class="btn-large adv-only" onclick="logRhythm('PEA')">PEA</button>
+            <button class="btn-large adv-only" onclick="logRhythm('Asystole')">Asystole</button>
+            <button class="btn-large btn-gold btn-full adv-only" onclick="logRhythm('ROSC')">ROSC Achieved</button>
+            <!-- Simple mode: no rhythm interpretation — just pulse present / absent. -->
+            <button class="btn-large btn-full btn-gray simple-only" onclick="logRhythm('No Pulse')">No Pulse — Continue CPR</button>
+            <button class="btn-large btn-full btn-gold simple-only" onclick="logRhythm('ROSC')">Pulse Found (ROSC)</button>
             <button class="btn-large btn-full btn-gray" onclick="cancelRhythmCheck()" style="margin-top:10px;">Cancel (resume CPR)</button>
         </div>
     </div>
@@ -1653,6 +1698,26 @@
     </div>
 </div>
 
+<!-- Glucose Slider Modal — Low · 20–600 · High -->
+<div id="modal-glucose-slider" class="modal-overlay">
+    <div class="modal" style="max-width: 420px;">
+        <h2>Blood Glucose</h2>
+        <div style="text-align:center; margin: 20px 0 10px 0;">
+            <div id="glucose-slider-value" style="font-size: 3.4em; font-weight: bold; line-height: 1; color: var(--primary-blue); font-variant-numeric: tabular-nums;">100</div>
+            <div style="font-size: 0.85em; color: var(--text-muted); margin-top: 4px;">mg/dL</div>
+            <div id="glucose-slider-context" style="margin-top: 10px; font-weight: bold; font-size: 0.9em; min-height: 1.2em;"></div>
+        </div>
+        <input type="range" id="glucose-slider" class="etco2-slider" min="19" max="601" value="100" step="1" oninput="updateGlucoseSlider()">
+        <div style="display:flex; justify-content:space-between; font-size: 0.75em; color: var(--text-muted); margin-top: 6px; padding: 0 6px;">
+            <span>LOW</span><span>20</span><span>300</span><span>600</span><span>HIGH</span>
+        </div>
+        <div class="btn-grid" style="margin-top: 20px;">
+            <button class="btn-large btn-gold" onclick="logGlucoseSlider()">Log Value</button>
+            <button class="btn-large btn-gray" onclick="closeModal('modal-glucose-slider')">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Atropine modal — phase-aware dose calc for adult vs peds (Broselow-driven) -->
 <div id="modal-atropine" class="modal-overlay">
     <div class="modal" style="max-width: 420px;">
@@ -1724,14 +1789,14 @@
                 <strong>PALS bolus:</strong> 20 mL/kg<br>
                 <span id="peds-fluid-calc-display" style="color:var(--primary-blue); font-weight:bold; font-size:1.2em;">— mL</span>
             </div>
-            <button class="btn-large btn-full btn-gold" id="btn-start-peds-fluid" onclick="startFluidsPedsBolus()">Start Calculated Bolus</button>
+            <button class="btn-large btn-full btn-gold" id="btn-start-peds-fluid" onclick="startFluidsPedsBolus()">Log Calculated Bolus</button>
         </div>
         
         <div class="input-group" style="margin-top:15px;">
             <label>Custom Volume (mL)</label>
             <div style="display:flex; gap:8px;">
                 <input type="tel" inputmode="numeric" pattern="[0-9]*" id="fluids-custom-input" class="text-input" placeholder="mL" style="flex:1; margin-bottom:0;">
-                <button class="btn-small blue" onclick="startFluidsCustom()">Start</button>
+                <button class="btn-small blue" onclick="startFluidsCustom()">Log</button>
             </div>
         </div>
         
@@ -1739,33 +1804,7 @@
     </div>
 </div>
 
-<!-- BVM Modal — captures basic airway adjunct + compliance -->
-<div id="modal-bvm" class="modal-overlay">
-    <div class="modal" style="max-width: 400px;">
-        <h2>BVM Ventilations</h2>
-        <div class="input-group">
-            <label>Basic Airway Adjunct</label>
-            <div class="chip-grid">
-                <button class="chip chip-bvm-adjunct" onclick="toggleChip(this, 'chip-bvm-adjunct')">OPA</button>
-                <button class="chip chip-bvm-adjunct" onclick="toggleChip(this, 'chip-bvm-adjunct')">NPA</button>
-                <button class="chip chip-bvm-adjunct" onclick="toggleChip(this, 'chip-bvm-adjunct')">None</button>
-            </div>
-        </div>
-        <div class="input-group">
-            <label>Compliance</label>
-            <div class="chip-grid">
-                <button class="chip chip-bvm-comp" onclick="toggleChip(this, 'chip-bvm-comp')">Good</button>
-                <button class="chip chip-bvm-comp" onclick="toggleChip(this, 'chip-bvm-comp')">Decreased</button>
-                <button class="chip chip-bvm-comp" onclick="toggleChip(this, 'chip-bvm-comp')">Poor</button>
-                <button class="chip chip-bvm-comp" onclick="toggleChip(this, 'chip-bvm-comp')">Difficult</button>
-            </div>
-        </div>
-        <div class="btn-grid">
-            <button class="btn-large btn-gold" onclick="logBVM()">Log BVM</button>
-            <button class="btn-large btn-gray" onclick="closeModal('modal-bvm')">Cancel</button>
-        </div>
-    </div>
-</div>
+<!-- (BVM modal removed) -->
 
 <!-- 12-Lead ECG Modal -->
 <div id="modal-12lead" class="modal-overlay">
@@ -2043,34 +2082,6 @@
             </div>
         </details>
 
-        <details class="med-accordion">
-            <summary>Magnesium Sulfate <span class="med-summary-hint">torsades</span></summary>
-            <div class="med-accordion-body">
-                <div class="med-settings-row"><label>Adult dose<small>2 g IV slow push</small></label><input type="number" id="cfg-mag-adult" step="500" min="500"><span class="unit">mg</span></div>
-                <div class="med-settings-row"><label>Peds per kg<small>50 mg/kg</small></label><input type="number" id="cfg-mag-peds-per-kg" step="5" min="5"><span class="unit">mg/kg</span></div>
-                <div class="med-settings-row"><label>Peds max<small>Cap on calculated dose</small></label><input type="number" id="cfg-mag-peds-max" step="100" min="100"><span class="unit">mg</span></div>
-                <div class="med-settings-row"><label>Concentration<small>5 g / 10 mL = 500 mg/mL</small></label><input type="number" id="cfg-mag-conc" step="50" min="50"><span class="unit">mg/mL</span></div>
-            </div>
-        </details>
-
-        <details class="med-accordion">
-            <summary>Dextrose <span class="med-summary-hint">hypoglycemia</span></summary>
-            <div class="med-accordion-body">
-                <div class="med-settings-row"><label>Adult dose<small>25 g (D50 50 mL or D10 250 mL)</small></label><input type="number" id="cfg-d-adult" step="5" min="5"><span class="unit">g</span></div>
-                <div class="med-settings-row"><label>Peds mL/kg of D10<small>5 mL/kg PALS</small></label><input type="number" id="cfg-d-peds-per-kg" step="0.5" min="0.5"><span class="unit">mL/kg</span></div>
-                <div class="med-settings-row"><label>Peds max mL<small>Cap on calculated mL</small></label><input type="number" id="cfg-d-peds-max" step="10" min="10"><span class="unit">mL</span></div>
-            </div>
-        </details>
-
-        <details class="med-accordion">
-            <summary>Naloxone (Narcan) <span class="med-summary-hint">opioid OD</span></summary>
-            <div class="med-accordion-body">
-                <div class="med-settings-row"><label>Adult dose<small>Low-dose titration preferred IV</small></label><input type="number" id="cfg-narcan-adult" step="0.1" min="0.1"><span class="unit">mg</span></div>
-                <div class="med-settings-row"><label>Peds per kg<small>0.1 mg/kg PALS</small></label><input type="number" id="cfg-narcan-peds-per-kg" step="0.01" min="0.01"><span class="unit">mg/kg</span></div>
-                <div class="med-settings-row"><label>Peds max single<small>Cap on calculated dose</small></label><input type="number" id="cfg-narcan-peds-max" step="0.1" min="0.1"><span class="unit">mg</span></div>
-                <div class="med-settings-row"><label>Concentration<small>2 mg / 2 mL = 1.0 mg/mL</small></label><input type="number" id="cfg-narcan-conc" step="0.1" min="0.1"><span class="unit">mg/mL</span></div>
-            </div>
-        </details>
 
         <details class="med-accordion">
             <summary>Push-Dose Epinephrine <span class="med-summary-hint">post-ROSC hypotension</span></summary>
@@ -2197,23 +2208,6 @@
             pedsPerKg: 20,
             concMgPerMl: 100                // 1 g / 10 mL
         },
-        magnesium: {                        // Torsades / refractory VF
-            adultDoseMg: 2000,              // 2 g IV
-            pedsPerKg: 50,                  // 50 mg/kg
-            pedsMaxMg: 2000,
-            concMgPerMl: 500                // 5 g / 10 mL
-        },
-        dextrose: {                         // Hypoglycemia
-            adultDoseG: 25,                 // 25 g (D50 50 mL or D10 250 mL)
-            pedsMlPerKg: 5,                 // D10 5 mL/kg
-            pedsMaxMl: 250
-        },
-        narcan: {                           // Naloxone — opioid OD
-            adultDoseMg: 0.5,
-            pedsPerKg: 0.1,
-            pedsMaxMg: 0.5,
-            concMgPerMl: 1.0                // Modern 2 mg / 2 mL ampule
-        },
         pushEpi: {                          // Push-dose epinephrine — post-ROSC hypotension
             pedsMlPerKg: 0.1,
             pedsMaxMl: 1
@@ -2297,6 +2291,40 @@
         });
     }
 
+    // --- UI Mode: Normal vs Simple ("Basic") ---
+    // Simple mode abstracts the dashboard to CPR / Pulse Check / Epi / Defib for lay
+    // rescuers. It only flips a body class (CSS does the showing/hiding) plus persists
+    // the choice, so it can be toggled before a code or carried across sessions.
+    // BLS = simple (basics only), ALS = full advanced view.
+    let simpleMode = false;
+    function applySimpleModeClass() {
+        document.body.classList.toggle('simple-mode', simpleMode);
+        // Sliding switch: thumb sits under 🚒 (BLS, left) or 🚑 (ALS, right); active icon lights up.
+        const btn = document.getElementById('btn-mode-toggle');
+        if (btn) {
+            const thumb = btn.querySelector('.mode-seg-thumb');
+            if (thumb) thumb.style.transform = simpleMode ? 'translateX(0)' : 'translateX(36px)';
+            const activeMode = simpleMode ? 'bls' : 'als';
+            btn.querySelectorAll('.mode-seg-opt').forEach(o => o.classList.toggle('active', o.dataset.mode === activeMode));
+            btn.setAttribute('aria-checked', String(!simpleMode)); // checked = ALS
+        }
+    }
+    function loadUiMode() {
+        let m = 'normal';
+        try { m = localStorage.getItem('uiMode') || 'normal'; } catch (_) {}
+        simpleMode = (m === 'simple');
+        applySimpleModeClass();
+    }
+    function setUiMode(mode) {
+        simpleMode = (mode === 'simple');
+        try { localStorage.setItem('uiMode', simpleMode ? 'simple' : 'normal'); } catch (_) {}
+        applySimpleModeClass();
+        showToast(simpleMode ? 'BLS mode — basics only' : 'ALS mode — full view');
+    }
+    function toggleUiMode() {
+        setUiMode(simpleMode ? 'normal' : 'simple');
+    }
+
     function openSettings() {
         // Reflect current theme in the picker
         let cur = 'auto';
@@ -2348,20 +2376,6 @@
         ['cfg-cal-adult',           'calcium.adultDoseMg'],
         ['cfg-cal-peds-per-kg',     'calcium.pedsPerKg'],
         ['cfg-cal-conc',            'calcium.concMgPerMl'],
-        // Magnesium
-        ['cfg-mag-adult',           'magnesium.adultDoseMg'],
-        ['cfg-mag-peds-per-kg',     'magnesium.pedsPerKg'],
-        ['cfg-mag-peds-max',        'magnesium.pedsMaxMg'],
-        ['cfg-mag-conc',            'magnesium.concMgPerMl'],
-        // Dextrose
-        ['cfg-d-adult',             'dextrose.adultDoseG'],
-        ['cfg-d-peds-per-kg',       'dextrose.pedsMlPerKg'],
-        ['cfg-d-peds-max',          'dextrose.pedsMaxMl'],
-        // Narcan
-        ['cfg-narcan-adult',        'narcan.adultDoseMg'],
-        ['cfg-narcan-peds-per-kg',  'narcan.pedsPerKg'],
-        ['cfg-narcan-peds-max',     'narcan.pedsMaxMg'],
-        ['cfg-narcan-conc',         'narcan.concMgPerMl'],
         // Push-Dose Epi
         ['cfg-pepi-peds-per-kg',    'pushEpi.pedsMlPerKg'],
         ['cfg-pepi-peds-max',       'pushEpi.pedsMaxMl'],
@@ -2471,11 +2485,11 @@
         cprStartedAtTotalTime: 0,  // totalTime value at moment first CPR started (CCF denom anchor)
         cprActive: false,
         cprTotalTime: 0,
-        cprPauseTime: 0, 
+        cprPauseTime: 0,
         alarmLastFiredAt: null,
-        lucasActive: false,
-        lucasTotalTime: 0,
-        pulseTimer: null, 
+        cprPauseLogged: false,  // true once the current pause has been logged as a >10s interruption
+
+        pulseTimer: null,
         pulseChimed: false,
         etco2Timer: 120,           // ETCO2 reminder timer (2-min default)
         etco2Chimed: false,
@@ -2496,8 +2510,6 @@
         pushEpiTimer: 0,
         pushEpiChimed: false,   // Plays alarm chime once when push-epi timer hits 0, then lingers
         everAchievedRosc: false,// Sticky flag — once true, blocks 20-min termination banner permanently
-        fluidsRunning: false,
-        fluidsStartTime: null,
         roscTimer: 0,
         ccfAtRosc: null,
         rearrests: 0,
@@ -2515,7 +2527,6 @@
         // Clinical state — used to build a clean handoff summary without parsing logs
         airway: null,           // {type:'ETT'|'i-gel', size, depth, confirms[], time}
         vascular: [],           // array of {type:'IV'|'IO', site, time}
-        defibPads: null,        // {type, placement}
         shockEnergies: [],      // array of joules per shock
         firstDefibAtTotalTime: null, // totalTime at first defib — used for TTFD metric
         lastEtco2: null,
@@ -2526,8 +2537,7 @@
         roscRhythm: null,       // underlying rhythm at moment of ROSC, pre-fills 12-Lead
         sedationGiven: false,
         glucoseChecked: false,
-        witnessed: null,        // 'Witnessed by EMS' | 'Witnessed by Bystander' | 'Unwitnessed'
-        suspectedEtiology: null, // 'Cardiac / ACS' | 'Respiratory' | etc.
+        downTime: 31,           // down-time slider value: 0=witnessed, 1–30=min, 31=unknown
         pacingHistory: [],      // each entry: {rate, output, capture}
         cardioversionHistory: [], // each entry: {energy, rhythm, sedation}
         rhythmHistory: [],      // every logged rhythm, in order
@@ -2563,6 +2573,7 @@
     window.onload = async () => {
         // Apply user preferences FIRST so the UI never flashes the wrong theme.
         loadThemePreference();
+        loadUiMode();
         loadMedConfig();
         buildHTList();
         loadState();
@@ -2597,9 +2608,8 @@
 
     function processMetronome() {
         if (!state.isActive || state.currentPhase !== 'ARREST') return;
-        // Metronome plays when manual CPR is active. When LUCAS is on, the device delivers
-        // compressions at its own fixed rate so we silence the metronome to avoid conflicting cues.
-        if (state.cprActive && !state.lucasActive) {
+        // Metronome plays when manual CPR is active.
+        if (state.cprActive) {
             playBeep(800, 'sine', 0.05, 0.05);
         }
     }
@@ -2644,9 +2654,6 @@
         }
         
         if (state.currentPhase === 'ARREST') {
-            // LUCAS is logged separately and does NOT bypass CPR pause logic.
-            // When CPR is paused (e.g. for rhythm check), compressions are paused even if LUCAS is "on"
-            // — providers should physically stop the device. The toggle is just for documentation.
             let isCompressing = state.cprActive;
 
             if (isCompressing) {
@@ -2665,6 +2672,12 @@
                 // Applies in BOTH adult and pediatric modes — cprHasStarted gates only the very first
                 // pause-from-rest case.
                 if (state.cprHasStarted && state.cprPauseTime >= 10) {
+                    // Log the interruption ONCE, only because it has now exceeded 10s. Short
+                    // pulse-check pauses never reach here, so they leave no timeline entry.
+                    if (!state.cprPauseLogged) {
+                        logAction("CPR interrupted > 10 sec");
+                        state.cprPauseLogged = true;
+                    }
                     // Visual: critical state stays applied while paused
                     if (!document.getElementById('cpr-card').classList.contains('alarm-critical')) {
                         document.getElementById('cpr-card').classList.add('alarm-critical');
@@ -2717,10 +2730,9 @@
             document.getElementById('clock-rosc').innerText = formatCountdown(state.roscTimer, true);
         }
 
-        // ETCO2 timer ticks in BOTH arrest AND ROSC phases — previously was inside the
-        // ARREST-only branch, which made the timer freeze during ROSC. ETCO2 monitoring
-        // is just as relevant post-ROSC for ventilation quality and re-arrest detection.
-        if (state.cprHasStarted) {
+        // ETCO2 reminder timer runs during ARREST only. In ROSC the ETCO2 timer is removed
+        // (ETCO2 can still be recorded on demand via the ROSC checklist).
+        if (state.cprHasStarted && state.currentPhase === 'ARREST') {
             state.etco2Timer -= delta;
             renderTimerWithOverdue('clock-etco2', 'etco2-overdue', 'card-etco2', state.etco2Timer, 'etco2-alarm');
             if (state.etco2Timer <= 0 && !state.etco2Chimed) {
@@ -2739,11 +2751,6 @@
                 playChime();
                 state.pushEpiChimed = true;
             }
-        }
-
-        if (state.fluidsRunning) {
-            const fDiff = state.totalTime - state.fluidsStartTime;
-            document.getElementById('fluids-timer-display').innerText = formatCountdown(fDiff, true);
         }
 
         if (document.getElementById('modal-intubation').style.display === 'flex' && intubStartTime !== null) {
@@ -2783,12 +2790,12 @@
         document.getElementById('btn-transport').classList.remove('hidden');
         document.getElementById('btn-undo').classList.remove('hidden');  // Now safe to expose Undo
         document.getElementById('btn-log').classList.remove('hidden');   // Code Log accessible from the top bar
+        document.getElementById('btn-mode-toggle').classList.remove('hidden'); // BLS/ALS toggle
         document.getElementById('btn-archive').classList.add('hidden'); // No accidental archive opens during a code
         
         if(state.isPediatric) {
             document.getElementById('sbp-target').innerText = '70';
-            // Hide Lucas & ETT for Peds
-            document.getElementById('btn-lucas').classList.add('hidden');
+            // Hide ETT tab for Peds
             document.getElementById('btn-tab-ett').classList.add('hidden');
             // Show peds igel sizes
             document.querySelectorAll('.peds-only').forEach(el => el.classList.remove('hidden'));
@@ -2804,7 +2811,6 @@
             document.getElementById('ped-weight-known').classList.add('hidden');
             logAction(`--- CODE START (PEDIATRIC) ---`);
         } else {
-            document.getElementById('btn-lucas').classList.remove('hidden');
             document.getElementById('sbp-target').innerText = '90';
             // Hide Months age option in adult mode
             document.querySelectorAll('.peds-only-option').forEach(el => { el.hidden = true; });
@@ -2864,9 +2870,6 @@
         const cL   = medConfig.lidocaine;
         const cBi  = medConfig.bicarbonate;
         const cCa  = medConfig.calcium;
-        const cMg  = medConfig.magnesium;
-        const cD   = medConfig.dextrose;
-        const cN   = medConfig.narcan;
         const cPe  = medConfig.pushEpi;
         const cDf  = medConfig.defib;
         const cFl  = medConfig.fluids;
@@ -2878,17 +2881,12 @@
         const lido2Mg = parseFloat((w * cL.pedsSubsequentPerKg).toFixed(1));
         const lido2Ml = parseFloat((lido2Mg / cL.concMgPerMl).toFixed(2));
         const fluids = parseFloat((w * cFl.pedsBolusMlPerKg).toFixed(0));
-        const d10Ml = parseFloat(Math.min(w * cD.pedsMlPerKg, cD.pedsMaxMl).toFixed(0));
-        const narcanMg = parseFloat(Math.min(w * cN.pedsPerKg, cN.pedsMaxMg).toFixed(2));
-        const narcanMl = parseFloat((narcanMg / cN.concMgPerMl).toFixed(2));
         const pEpiMl = parseFloat(Math.min(w * cPe.pedsMlPerKg, cPe.pedsMaxMl).toFixed(2));
         const bicarbMeq = parseFloat((w * cBi.pedsPerKg).toFixed(1));
         const bicarbMl = parseFloat((bicarbMeq / cBi.concMEqPerMl).toFixed(1));
         const calMg = parseFloat((w * cCa.pedsPerKg).toFixed(0));
         const calMl = parseFloat((calMg / cCa.concMgPerMl).toFixed(1));
-        const magMg = parseFloat(Math.min(w * cMg.pedsPerKg, cMg.pedsMaxMg).toFixed(0));
-        const magMl = parseFloat((magMg / cMg.concMgPerMl).toFixed(2));
-        
+
         // Defib values use configurable J/kg steps with a J ceiling. The 3rd+ shock label
         // spans the PALS range (3rd-J to 10 J/kg per AHA) but defaults to the configured value.
         const defib1 = Math.min(w * cDf.pedsFirstJperKg, cDf.pedsMaxJ);
@@ -2903,9 +2901,6 @@
         const lido2Rule  = `${cL.pedsSubsequentPerKg} mg/kg`;
         const bicarbRule = `${cBi.pedsPerKg} mEq/kg`;
         const calRule    = `${cCa.pedsPerKg} mg/kg · ${cCa.concMgPerMl} mg/mL`;
-        const magRule    = `${cMg.pedsPerKg} mg/kg · max ${cMg.pedsMaxMg} mg`;
-        const narcanRule = `${cN.pedsPerKg} mg/kg · ${cN.concMgPerMl} mg/mL`;
-        const d10Rule    = `${cD.pedsMlPerKg} mL/kg · max ${cD.pedsMaxMl}`;
         const fluidsRule = `${cFl.pedsBolusMlPerKg} mL/kg`;
         const pEpiRule   = `max ${cPe.pedsMaxMl} mL`;
 
@@ -2919,9 +2914,6 @@
                 <tr><td><strong>Lido 2nd+</strong><br><span class="ped-mini">${lido2Rule}</span></td><td>${lido2Mg} mg</td><td><strong>${lido2Ml} mL</strong></td></tr>
                 <tr><td><strong>Bicarb</strong><br><span class="ped-mini">${bicarbRule}</span></td><td>${bicarbMeq} mEq</td><td><strong>${bicarbMl} mL</strong></td></tr>
                 <tr><td><strong>CaCl</strong><br><span class="ped-mini">${calRule}</span></td><td>${calMg} mg</td><td><strong>${calMl} mL</strong></td></tr>
-                <tr><td><strong>Mag</strong><br><span class="ped-mini">${magRule}</span></td><td>${magMg} mg</td><td><strong>${magMl} mL</strong></td></tr>
-                <tr><td><strong>Narcan</strong><br><span class="ped-mini">${narcanRule}</span></td><td>${narcanMg} mg</td><td><strong>${narcanMl} mL</strong></td></tr>
-                <tr><td><strong>D10</strong><br><span class="ped-mini">${d10Rule}</span></td><td>—</td><td><strong>${d10Ml} mL</strong></td></tr>
                 <tr><td><strong>Fluid Bolus</strong><br><span class="ped-mini">${fluidsRule}</span></td><td>—</td><td><strong>${fluids} mL</strong></td></tr>
                 <tr><td><strong>Push Epi</strong><br><span class="ped-mini">${pEpiRule}</span></td><td>—</td><td><strong>${pEpiMl} mL</strong></td></tr>
                 <tr class="ped-dose-defib"><td colspan="3"><strong>Defib (J):</strong> 1st ${defib1} · 2nd ${defib2} · 3rd+ ${defib3}–${defib10}</td></tr>
@@ -2981,37 +2973,18 @@
             btn.innerText = "PAUSE CPR";
             btn.className = "btn-large btn-gray";
             if (!state.logs.some(l => l.includes("CPR Started"))) {
-                logAction("CPR Started");
-            } else {
+                logAction("CPR Started"); // first compressions of the code — always logged
+            } else if (state.cprPauseLogged) {
+                // Only note the resume if this interruption already crossed 10s and was logged.
                 logAction("CPR Resumed");
             }
+            state.cprPauseLogged = false;
         } else {
             btn.innerText = "RESUME CPR";
-            btn.className = "btn-large btn-red"; 
-            logAction("CPR Paused");
-        }
-    }
-
-    function toggleLucas() {
-        // LUCAS toggle is now documentation-only — it does NOT bypass CPR pause/resume.
-        // When LUCAS is on AND CPR is active, compressions are being delivered by the device.
-        // When CPR pauses (rhythm check, etc.), providers should physically stop the device.
-        state.lucasActive = !state.lucasActive;
-        const btn = document.getElementById('btn-lucas');
-        const status = document.getElementById('lucas-status');
-
-        if (state.lucasActive) {
-            btn.innerText = "LUCAS: ON";
-            btn.className = "btn-large btn-blue";
-            btn.style.background = "var(--primary-blue)";
-            status.classList.remove('hidden');
-            logAction("LUCAS Device Applied (ON)");
-        } else {
-            btn.innerText = "LUCAS";
-            btn.className = "btn-large btn-gray";
-            btn.style.background = "";
-            status.classList.add('hidden');
-            logAction("LUCAS Device Removed (OFF)");
+            btn.className = "btn-large btn-red";
+            // Pauses (e.g. for pulse checks) are NOT logged here — processTimers logs the
+            // interruption only if it exceeds 10s, so quick checks don't clutter the timeline.
+            state.cprPauseLogged = false;
         }
     }
 
@@ -3060,18 +3033,14 @@
         let brief = `${age}${ageUnit} ${gender} ${ptType.toLowerCase()} cardiac arrest`;
         if (state.isPediatric && state.pediatricWeight) brief += ` (${state.pediatricWeight} kg)`;
         line(brief);
-        // Witnessed status — sits right under patient brief since it's clinically critical
-        if (state.witnessed) line(state.witnessed);
-        // Suspected etiology / mechanism — drives the receiving team's first-5-min thinking
-        if (state.suspectedEtiology) line(`Suspected etiology: ${state.suspectedEtiology}`);
 
         // === 2. EVENT / DOWN TIME ===
-        const downtime = document.getElementById('pt-downtime')?.value;
+        if (state.downTime === 0) line('Witnessed arrest');
+        else line(`Down time: ${downTimePhrase()}`);
         const ptaActions = (state.ptaLogs || []).filter(l => l.includes('[PTA]'));
         const ptaShort = ptaActions
             .map(l => l.replace('[PTA] ', ''))
-            .filter(l => !l.startsWith('Estimated Down Time') && !l.startsWith('Witnessed status') && !l.startsWith('Suspected etiology'));
-        if (downtime) line(`Down time: ~${downtime} min prior to arrival`);
+            .filter(l => !l.startsWith('Estimated Down Time'));
         if (ptaShort.length) line(`PTA care: ${ptaShort.join('; ')}`);
 
         // === 3. INITIAL RHYTHM ===
@@ -3212,7 +3181,6 @@
             }
             postRosc.push(pe);
         }
-        if (state.fluidsRunning) postRosc.push('Fluids infusing');
         if (state.sedationGiven) postRosc.push('Versed given post-ROSC');
         if (postRosc.length) {
             header(`ACTIVE / POST-ROSC`);
@@ -3314,7 +3282,8 @@
             if (btn && !btn.classList.contains('completed')) {
                 btn.classList.add('completed');
                 const ts = getFormattedTime();
-                const span = btn.querySelector('span');
+                // Prefer a dedicated .ts-span (chk-sbp's first span holds the "90" target).
+                const span = btn.querySelector('.ts-span') || btn.querySelector('span');
                 if (span) span.innerText = `(${ts})`;
                 state.checklistsCompleted.push({ id, text, ts });
             }
@@ -3332,12 +3301,10 @@
         if (state.glucoseChecked) {
             tick('chk-glucose', 'Checked Blood Glucose');
         }
-        // ETCO2 in target range
+        // ETCO2 — tick once any value has been recorded (ventilation is being monitored),
+        // not only when it lands in the 35-45 target. Otherwise the item never checks off.
         if (state.etco2History && state.etco2History.length) {
-            const last = state.etco2History[state.etco2History.length - 1];
-            if (last >= 35 && last <= 45) {
-                tick('chk-vent', 'Ventilating to ETCO2 35-45');
-            }
+            tick('chk-vent', 'Ventilating to ETCO2 35-45');
         }
         // SBP at target (post-ROSC goal is >90 adult, >70+2×age peds — use 90 as common floor).
         // We tick as long as any recorded SBP meets the target; the target is shown next to
@@ -3400,26 +3367,27 @@
             document.getElementById('card-etco2').classList.remove('etco2-alarm');
             document.getElementById('etco2-overdue').classList.add('hidden');
             logAction("--- ROSC ACHIEVED ---");
-            // Hide the arrest-specific timer cards (rhythm/epi/lido) but keep the grid + ETCO2 visible.
-            // Spanning ETCO2 across both columns gives it a clean look when it's alone in the grid.
+            // ROSC view: hide the arrest timer cards AND the ETCO2 timer. Hide the Code Clock card
+            // and surface the ROSC clock + push-dose-epi timer side by side at the top instead.
             document.querySelectorAll('.arrest-only-card').forEach(el => el.classList.add('hidden'));
-            document.getElementById('card-etco2').classList.add('etco2-span');
+            document.getElementById('card-etco2').classList.add('hidden');
+            document.getElementById('cpr-card').classList.add('hidden');
+            document.querySelectorAll('.rosc-only-card').forEach(el => el.classList.remove('hidden'));
+            document.getElementById('clock-push-epi').innerText = '--:--';
             document.getElementById('rosc-timers').classList.remove('hidden');
-            document.getElementById('cpr-buttons-container').classList.add('hidden');
-            document.getElementById('lucas-status').classList.add('hidden');
             document.getElementById('banner-20min').classList.add('hidden');
-            
+
             state.cprActive = false;
-            state.lucasActive = false; 
-            
+            state.cprPauseLogged = false; // clear so a stale flag can't mislabel the next resume
+            state.pushEpiActive = false; // push-epi timer idles at --:-- until the first dose
             document.getElementById('cpr-heart').classList.remove('heart-beat');
-            document.getElementById('cpr-card').classList.remove('alarm-critical');
             document.getElementById('pause-warning').classList.add('hidden');
 
             // Auto-tick ROSC checklist items based on treatments already completed
             autoTickRoscChecklist();
-            // Prompt the team for the underlying ROSC rhythm — this auto-fills the 12-Lead
-            setTimeout(() => openModal('modal-rosc-rhythm'), 300);
+            // Prompt the team for the underlying ROSC rhythm — this auto-fills the 12-Lead.
+            // Skipped in Simple mode (lay rescuers don't interpret rhythms).
+            if (!simpleMode) setTimeout(() => openModal('modal-rosc-rhythm'), 300);
         }
 
         // --- Pulse check complete: CPR resumes automatically ---
@@ -3427,7 +3395,7 @@
         // restarting compressions is implied. ROSC is the only exception (the patient has a
         // pulse, so compressions stay off and we transitioned to the post-ROSC view above).
         if (rhythm !== 'ROSC' && !state.cprActive) {
-            toggleCPR(); // resumes compressions (logs "CPR Resumed", restarts the metronome)
+            toggleCPR(); // resumes compressions + restarts the metronome (resume not logged unless the pause exceeded 10s)
         }
     }
 
@@ -3449,6 +3417,7 @@
         state.epiChimed = false;
         state.lidoChimed = false;
         state.pushEpiChimed = false;
+        state.cprPauseLogged = false;
         // ETCO2 cadence reverts to 2 min during re-arrest
         state.etco2Timer = 120;
         state.etco2Chimed = false;
@@ -3463,28 +3432,25 @@
         logAction(`--- RE-ARREST ${state.rearrests} ---`);
         
         document.getElementById('rosc-timers').classList.add('hidden');
-        // Restore arrest-specific cards and drop the ETCO2 full-span class
+        // Re-arrest → back to a normal cardiac-arrest view: restore the Code Clock card, the
+        // arrest timer cards, and the ETCO2 timer; hide the ROSC-only cards (ROSC clock + push-epi).
+        document.getElementById('cpr-card').classList.remove('hidden');
+        document.querySelectorAll('.rosc-only-card').forEach(el => el.classList.add('hidden'));
         document.getElementById('card-rhythm').classList.remove('hidden');
         document.getElementById('card-epi').classList.remove('hidden');
         // Lido card is always visible during ARREST (like Epi) — show it regardless of dose state.
         document.getElementById('card-lido').classList.remove('hidden');
-        document.getElementById('card-etco2').classList.remove('etco2-span');
-        // Push-dose epi is a post-ROSC therapy (for hypotension) — hide the card on re-arrest.
-        // Regular epinephrine resumes via the standard Epi timer.
+        // Simple-mode defib card is also arrest-only — re-show it (CSS keeps it hidden in Normal mode).
+        document.getElementById('card-defib-simple')?.classList.remove('hidden');
+        document.getElementById('card-etco2').classList.remove('hidden');
+        // Push-dose epi is a post-ROSC therapy — stop its timer on re-arrest.
         state.pushEpiActive = false;
-        document.getElementById('card-push-epi').classList.add('hidden');
         document.getElementById('cpr-buttons-container').classList.remove('hidden');
         
         document.getElementById('btn-cpr').innerText = "START CPR";
         document.getElementById('btn-cpr').className = "btn-large btn-red";
         state.cprActive = false;
-        
-        if (!state.isPediatric) {
-            document.getElementById('btn-lucas').innerText = "LUCAS";
-            document.getElementById('btn-lucas').className = "btn-large btn-gray";
-            document.getElementById('btn-lucas').style.background = "";
-        }
-        
+
         document.querySelectorAll('.checklist-btn').forEach(btn => {
             btn.classList.remove('completed');
             btn.querySelector('span').innerText = '';
@@ -3678,6 +3644,16 @@
         }
     }
 
+    // BLS-mode defib: logs a shock without the Joules prompt used in ALS mode. State updates
+    // mirror the Defibrillation branch of logValuePrompt (shock count + time-to-first-defib)
+    // so the report/undo stay consistent.
+    function logAedShock() {
+        state.totalShocks = (state.totalShocks || 0) + 1;
+        if (state.firstDefibAtTotalTime == null) state.firstDefibAtTotalTime = state.totalTime;
+        logAction('Defibrillated / Shock Delivered');
+        showToast('Shock logged ✓');
+    }
+
     function cancelLido() {
         // Nothing to cancel if no timer is running (card is always visible now, so the ✕
         // can be tapped before any dose — don't log a meaningless "canceled" entry).
@@ -3719,7 +3695,7 @@
         } else {
             logAction("Administered Push Dose Epinephrine");
         }
-        document.getElementById('card-push-epi').classList.remove('hidden');
+        // Card is always present during ROSC; the timer now starts/resets here.
     }
 
     // ====== ATROPINE ======
@@ -3887,7 +3863,6 @@
 
     // --- Specialized Interventions ---
     function openInterventions() {
-        document.getElementById('btn-fluids-interv').classList.toggle('hidden', state.fluidsRunning);
         // Show / hide phase-restricted treatments:
         //   .interv-arrest-only (Defibrillation) → only while currently in ARREST
         //   .interv-rosc-only   (Pacing, Cardioversion) → only while currently in ROSC
@@ -3995,30 +3970,20 @@
         openModal('modal-fluids-start');
     }
 
+    // Fluids are now a single-tap log (no running infusion timer / "complete" step).
     function startFluids(volumeMl) {
         closeModal('modal-fluids-start');
-        state.fluidsRunning = true;
-        state.fluidsStartTime = state.totalTime;
-        state.fluidsVolume = volumeMl;
-        logAction(`Fluids Started (${volumeMl} mL bolus)`);
-        document.getElementById('active-fluids-card').classList.remove('hidden');
+        logAction(`IV/IO Fluid Bolus: ${volumeMl} mL`);
     }
-    
+
     function startFluidsPedsBolus() {
         const ml = parseInt(document.getElementById('btn-start-peds-fluid').dataset.ml, 10);
         if (ml) startFluids(ml);
     }
-    
+
     function startFluidsCustom() {
         const v = parseInt(document.getElementById('fluids-custom-input').value, 10);
         if (v > 0) startFluids(v);
-    }
-    
-    function completeFluids() {
-        const vol = state.fluidsVolume ? ` (${state.fluidsVolume} mL administered)` : '';
-        logAction(`Fluids Complete${vol}`);
-        state.fluidsRunning = false;
-        document.getElementById('active-fluids-card').classList.add('hidden');
     }
 
     function openOtherMed() {
@@ -4098,7 +4063,7 @@
     function handleIntubCprPauseToggle() {
         const checked = document.getElementById('intub-cpr-pause').checked;
         if (checked && state.cprActive) {
-            toggleCPR(); // pauses CPR + logs "CPR Paused"
+            toggleCPR(); // pauses CPR (logged only if the interruption exceeds 10s)
             intubPausedCPR = true;
         } else if (!checked && intubPausedCPR && !state.cprActive) {
             // User unchecked — resume CPR
@@ -4211,22 +4176,11 @@
             // PALS doses (peds) — every value sourced from medConfig
             if (type === 'Bicarbonate') input.value = parseFloat((w * medConfig.bicarbonate.pedsPerKg).toFixed(1));
             if (type === 'Calcium')     input.value = parseFloat((w * medConfig.calcium.pedsPerKg).toFixed(1));
-            if (type === 'Dextrose')    input.value = parseFloat(Math.min(w * medConfig.dextrose.pedsMlPerKg, medConfig.dextrose.pedsMaxMl).toFixed(1));
-            if (type === 'Magnesium')   input.value = parseFloat(Math.min(w * medConfig.magnesium.pedsPerKg, medConfig.magnesium.pedsMaxMg).toFixed(1));
-            if (type === 'Narcan') {
-                const nCfg = medConfig.narcan;
-                input.value = parseFloat(Math.min(w * nCfg.pedsPerKg, nCfg.pedsMaxMg).toFixed(2));
-            }
-            // Fluids Complete default: configurable mL/kg bolus
-            if (type === 'Fluids Complete') input.value = parseFloat((w * medConfig.fluids.pedsBolusMlPerKg).toFixed(0));
         }
         else {
             // ADULT default doses — all sourced from medConfig
             if (type === 'Bicarbonate') input.value = medConfig.bicarbonate.adultDoseMEq;
             if (type === 'Calcium')     input.value = medConfig.calcium.adultDoseMg;
-            if (type === 'Dextrose')    input.value = medConfig.dextrose.adultDoseG;
-            if (type === 'Magnesium')   input.value = medConfig.magnesium.adultDoseMg;
-            if (type === 'Narcan')      input.value = medConfig.narcan.adultDoseMg;
             if (type === 'Glucose')     input.value = '';        // No default — measured
             if (type === 'ETCO2')       input.value = '';        // No default — measured
         }
@@ -4270,9 +4224,9 @@
             }
             logText = `Defibrillated / Shock Delivered${suffix}`;
         }
-        else if (['Bicarbonate', 'Calcium', 'Magnesium', 'Dextrose', 'Narcan'].includes(type)) {
+        else if (['Bicarbonate', 'Calcium'].includes(type)) {
             logText = `Administered ${type}${suffix}`;
-        } 
+        }
         else if (type === 'ETCO2') {
             // Annotate ETCO2 with clinical context for the PCR
             let note = '';
@@ -4336,6 +4290,13 @@
         // checks auto-tick the moment their underlying data lands in state.
         if (state.currentPhase === 'ROSC') autoTickRoscChecklist();
         renderLogs();
+        // Briefly flash the last-action line so a new entry is noticeable at a glance.
+        const ribbon = document.getElementById('last-action-ribbon');
+        if (ribbon && !ribbon.classList.contains('hidden')) {
+            ribbon.classList.remove('flash');
+            void ribbon.offsetWidth; // force reflow so the animation restarts each time
+            ribbon.classList.add('flash');
+        }
     }
 
     function undoLastLog() {
@@ -4419,9 +4380,6 @@
         if (popped.includes("Access Established")) {
             if (state.vascular?.length) state.vascular.pop();
         }
-        if (popped.includes("Defib Pads Placed")) {
-            state.defibPads = null;
-        }
         if (popped.includes("12-Lead ECG —")) {
             state.ecg12Lead = null;
         }
@@ -4500,6 +4458,20 @@
             div.textContent = l;
             win.appendChild(div);
         });
+        // H's & T's go in their own section at the bottom — NOT timestamped in the timeline.
+        const htKeys = Object.keys(state.htStates || {});
+        if (htKeys.length) {
+            const divider = document.createElement('div');
+            divider.className = 'log-divider';
+            divider.textContent = "— H's & T's —";
+            win.appendChild(divider);
+            htKeys.forEach(name => {
+                const div = document.createElement('div');
+                div.className = 'log-entry';
+                div.textContent = `${name}: ${state.htStates[name]}`;
+                win.appendChild(div);
+            });
+        }
         win.scrollTop = win.scrollHeight;
         // Update counts: full label inside the modal title, compact badge on the top-bar button.
         const count = (state.logs?.length || 0) + (state.ptaLogs?.length || 0);
@@ -4800,8 +4772,8 @@
         const famPhone = document.getElementById('pt-family-phone');
         if (famName) famName.value = '';
         if (famPhone) famPhone.value = '';
-        const dt = document.getElementById('pt-downtime');
-        if (dt) dt.value = '';
+        const dt = document.getElementById('pt-downtime-slider');
+        if (dt) { dt.value = 31; state.downTime = 31; updateDowntimeLabel(); }
         document.getElementById('btn-pt-info').classList.add('hidden');
         document.getElementById('btn-end-code-top').classList.add('hidden');
         document.getElementById('btn-transport').classList.add('hidden');
@@ -4843,12 +4815,12 @@
         const wasActive = state.htStates[item] === action;
         const finalAction = wasActive ? null : action;
         
+        // H&T rule-outs are NOT written to the timestamped timeline — they live in their own
+        // untimestamped section (state.htStates), rendered at the bottom of the log + report.
         if (wasActive) {
             delete state.htStates[item];
-            logAction(`H&T Cleared: ${item}`);
         } else {
             state.htStates[item] = action;
-            logAction(`${action}: ${item}`);
         }
 
         const row = document.getElementById(`ht-row-${idx}`);
@@ -4866,6 +4838,69 @@
         });
         if (finalAction === 'Not a Factor') document.getElementById(`ht-na-${idx}`)?.classList.add('active');
         else if (finalAction === 'Treated')  document.getElementById(`ht-tr-${idx}`)?.classList.add('active');
+        // Refresh the log's H&T section + handoff, and persist (no logAction was called).
+        renderLogs();
+        refreshHandoffIfVisible();
+        saveState();
+    }
+
+    // --- ROSC checklist helpers ---
+    // SBP item: tapping just toggles the check (no vitals screen). "Maintain SBP > 90" is a
+    // goal acknowledgement, not a value entry.
+    function toggleSbpCheck() {
+        const btn = document.getElementById('chk-sbp');
+        if (!btn) return;
+        const span = btn.querySelector('.ts-span');
+        if (btn.classList.contains('completed')) {
+            btn.classList.remove('completed');
+            if (span) span.textContent = '';
+            state.checklistsCompleted = (state.checklistsCompleted || []).filter(c => c.id !== 'chk-sbp');
+        } else {
+            btn.classList.add('completed');
+            const ts = getFormattedTime();
+            if (span) span.textContent = `(${ts})`;
+            (state.checklistsCompleted || (state.checklistsCompleted = [])).push({ id: 'chk-sbp', text: 'SBP at target', ts });
+        }
+        saveState();
+        refreshHandoffIfVisible();
+    }
+
+    // --- Glucose slider: Low · 20–600 · High ---
+    function glucoseLabel(v) {
+        if (v <= 19) return 'LOW';
+        if (v >= 601) return 'HIGH';
+        return String(v);
+    }
+    function openGlucoseSlider() {
+        closeModal('modal-interventions'); // harmless if it isn't open
+        const s = document.getElementById('glucose-slider');
+        const prev = parseInt(state.glucoseValue, 10);
+        s.value = (Number.isFinite(prev) && prev >= 20 && prev <= 600) ? prev : 100;
+        updateGlucoseSlider();
+        openModal('modal-glucose-slider');
+    }
+    function updateGlucoseSlider() {
+        const v = parseInt(document.getElementById('glucose-slider').value, 10);
+        const disp = document.getElementById('glucose-slider-value');
+        disp.textContent = glucoseLabel(v);
+        let ctx = '', color = 'var(--text-main)';
+        if (v <= 19)        { ctx = 'Off-scale low'; color = 'var(--alert-red)'; }
+        else if (v >= 601)  { ctx = 'Off-scale high'; color = 'var(--alert-red)'; }
+        else if (v < 70)    { ctx = '⚠️ Hypoglycemia — consider dextrose'; color = 'var(--alert-red)'; }
+        else if (v <= 180)  { ctx = '✓ In range'; color = 'var(--primary-blue)'; }
+        else                { ctx = 'Hyperglycemia'; color = '#B8860B'; }
+        disp.style.color = color;
+        const ce = document.getElementById('glucose-slider-context');
+        ce.textContent = ctx; ce.style.color = color;
+    }
+    function logGlucoseSlider() {
+        const v = parseInt(document.getElementById('glucose-slider').value, 10);
+        const label = glucoseLabel(v);
+        state.glucoseChecked = true;
+        state.glucoseValue = label;
+        const unit = (v >= 20 && v <= 600) ? ' mg/dL' : '';
+        logAction(`Glucose: ${label}${unit}`);
+        closeModal('modal-glucose-slider');
     }
 
     // Dev fast-forward is no longer meaningful: the wall-clock timer engine
@@ -4941,6 +4976,7 @@
         document.getElementById('btn-end-code-top')?.classList.add('hidden');
         document.getElementById('btn-undo')?.classList.add('hidden');
         document.getElementById('btn-log')?.classList.add('hidden');
+        document.getElementById('btn-mode-toggle')?.classList.add('hidden');
         // Code is over — re-expose Archive so saved cases stay reachable from this screen.
         document.getElementById('btn-archive')?.classList.remove('hidden');
         // Wire up the Share button (uses native share sheet — covers iMessage, Mail, etc.)
@@ -5071,12 +5107,11 @@
             const elapsedWhileAway = newTotalTime - state.totalTime;
             if (elapsedWhileAway > 0) {
                 state.totalTime = newTotalTime;
-                if (state.cprActive || state.lucasActive) {
+                if (state.cprActive) {
                     state.cprTotalTime += elapsedWhileAway;
                 } else if (state.cprHasStarted) {
                     state.cprPauseTime += elapsedWhileAway;
                 }
-                if (state.lucasActive) state.lucasTotalTime += elapsedWhileAway;
                 if (state.pulseTimer !== null) state.pulseTimer -= elapsedWhileAway;
                 if (state.epiTimer !== null) state.epiTimer -= elapsedWhileAway;
                 if (state.lidoActive && state.lidoTimer !== null) state.lidoTimer -= elapsedWhileAway;
@@ -5094,11 +5129,11 @@
             document.getElementById('btn-end-code-top').classList.remove('hidden');
             document.getElementById('btn-undo').classList.remove('hidden');
             document.getElementById('btn-log').classList.remove('hidden');
+            document.getElementById('btn-mode-toggle').classList.remove('hidden');
             document.getElementById('btn-archive').classList.add('hidden');
 
             if (state.isPediatric) {
                 document.getElementById('sbp-target').innerText = '70';
-                document.getElementById('btn-lucas').classList.add('hidden');
                 document.getElementById('btn-tab-ett').classList.add('hidden');
                 document.querySelectorAll('.peds-only').forEach(el => el.classList.remove('hidden'));
                 document.querySelectorAll('.adult-only').forEach(el => el.classList.add('hidden'));
@@ -5114,7 +5149,6 @@
                     document.getElementById('ped-weight-known').classList.add('hidden');
                 }
             } else {
-                document.getElementById('btn-lucas').classList.remove('hidden');
                 document.getElementById('sbp-target').innerText = '90';
                 document.querySelectorAll('.peds-only-option').forEach(el => { el.hidden = true; });
                 document.querySelectorAll('.peds-hx-container').forEach(el => el.classList.add('hidden'));
@@ -5139,17 +5173,11 @@
             
             if (state.currentPhase === 'ARREST') {
                 document.getElementById('arrest-timers').classList.remove('hidden');
+                document.getElementById('cpr-card').classList.remove('hidden');
+                document.querySelectorAll('.rosc-only-card').forEach(el => el.classList.add('hidden'));
                 if (codeClockSeconds() >= 1200 && !state.everAchievedRosc) document.getElementById('banner-20min').classList.remove('hidden');
                 document.getElementById('card-lido').classList.remove('hidden'); // always visible in ARREST, like Epi
-                if (state.pushEpiActive) document.getElementById('card-push-epi').classList.remove('hidden');
-                
-                if (state.lucasActive) {
-                    document.getElementById('lucas-status').classList.remove('hidden');
-                    document.getElementById('btn-lucas').innerText = "LUCAS: ON";
-                    document.getElementById('btn-lucas').className = "btn-large btn-blue";
-                    document.getElementById('btn-lucas').style.background = "var(--primary-blue)";
-                }
-                
+
                 if (state.cprActive) {
                     document.getElementById('btn-cpr').innerText = "PAUSE CPR";
                     document.getElementById('btn-cpr').className = "btn-large btn-gray";
@@ -5159,15 +5187,17 @@
                     document.getElementById('btn-cpr').className = "btn-large btn-red";
                 }
             } else {
-                // ROSC on reload: keep the arrest-timers grid visible but hide arrest-only cards;
-                // span ETCO2 across the grid so it doesn't look isolated.
+                // ROSC on reload: hide the arrest cards + ETCO2 timer + Code Clock card; show the
+                // ROSC clock + push-epi (side by side) and the ROSC checklist.
                 document.getElementById('arrest-timers').classList.remove('hidden');
                 document.querySelectorAll('.arrest-only-card').forEach(el => el.classList.add('hidden'));
-                document.getElementById('card-etco2').classList.add('etco2-span');
+                document.getElementById('card-etco2').classList.add('hidden');
+                document.getElementById('cpr-card').classList.add('hidden');
+                document.querySelectorAll('.rosc-only-card').forEach(el => el.classList.remove('hidden'));
+                if (!state.pushEpiActive) document.getElementById('clock-push-epi').innerText = '--:--';
                 document.getElementById('rosc-timers').classList.remove('hidden');
             }
-            if (state.fluidsRunning) document.getElementById('active-fluids-card').classList.remove('hidden');
-            
+
             if (state.isDoeActive) {
                 document.getElementById('btn-doe-toggle').classList.remove('gold');
                 document.getElementById('btn-doe-toggle').classList.add('blue');
@@ -5177,34 +5207,17 @@
                 const btn = document.getElementById(c.id);
                 if (btn) {
                     btn.classList.add('completed');
-                    btn.querySelector('span').innerText = c.ts;
+                    // chk-sbp has a dedicated .ts-span (its first span is the "90" target) — prefer it.
+                    const span = btn.querySelector('.ts-span') || btn.querySelector('span');
+                    if (span) span.innerText = `(${c.ts})`;
                 }
             });
 
-            // Restore witnessed chip selection
-            if (state.witnessed) {
-                document.querySelectorAll('.chip-witnessed').forEach(el => {
-                    if (el.innerText === state.witnessed) el.classList.add('active');
-                });
-            }
-            // Restore etiology chip selection
-            if (state.suspectedEtiology) {
-                // Chip text doesn't always match label exactly (e.g. "Toxic / OD" vs "Toxic / Overdose")
-                // so match against the onclick handler value via dataset would be cleaner. For now,
-                // re-derive by matching the label substrings used in setEtiology calls.
-                const map = {
-                    'Cardiac / ACS': 'Cardiac / ACS', 'Respiratory': 'Respiratory',
-                    'Trauma': 'Trauma', 'Hypoxic': 'Hypoxic',
-                    'Toxic / Overdose': 'Toxic / OD', 'Metabolic / Electrolyte': 'Metabolic',
-                    'Drowning': 'Drowning', 'Anaphylaxis': 'Anaphylaxis',
-                    'Electrical': 'Electrical', 'Unknown': 'Unknown'
-                };
-                const chipLabel = map[state.suspectedEtiology];
-                if (chipLabel) {
-                    document.querySelectorAll('.chip-etiology').forEach(el => {
-                        if (el.innerText === chipLabel) el.classList.add('active');
-                    });
-                }
+            // Restore the down-time slider position
+            const _dtSlider = document.getElementById('pt-downtime-slider');
+            if (_dtSlider && state.downTime != null) {
+                _dtSlider.value = state.downTime;
+                updateDowntimeLabel();
             }
 
             // Restore H's & T's visuals (state.htStates saved; DOM rebuilt on each load)
@@ -5578,13 +5591,10 @@
      * Dedups against prior PTA logs so re-saving doesn't create duplicate entries.
      */
     function savePtInfoAndClose() {
-        const val = document.getElementById('pt-downtime')?.value.trim();
-        if (val) {
-            const ptaLogs = state.ptaLogs || [];
-            // Remove any prior down-time PTA entries so each save reflects the current value
-            state.ptaLogs = ptaLogs.filter(l => !l.includes('Estimated Down Time'));
-            logPTAEntry(`Estimated Down Time: ${val} minutes prior to EMS arrival`);
-        }
+        // Down time comes from the slider (state.downTime). Log a single, deduped PTA entry.
+        const ptaLogs = state.ptaLogs || [];
+        state.ptaLogs = ptaLogs.filter(l => !l.includes('Estimated Down Time'));
+        logPTAEntry(`Estimated Down Time — ${downTimePhrase()}`);
         closeModal('modal-demographics');
         saveState();
         // PT Info can change demographics that the handoff renders (hx, meds, family contact)
@@ -5592,29 +5602,24 @@
         refreshHandoffIfVisible();
     }
 
-    function setWitnessed(btn, label) {
-        // Single-select chip behavior — clear siblings, mark this active
-        document.querySelectorAll('.chip-witnessed').forEach(el => el.classList.remove('active'));
-        if (state.witnessed === label) {
-            // Tapping same chip clears it
-            state.witnessed = null;
-        } else {
-            btn.classList.add('active');
-            state.witnessed = label;
-            logPTAEntry(`Witnessed status: ${label}`);
-        }
+    // Down-time slider: 0 = witnessed arrest, 1–30 = minutes prior to arrival, 31 = unknown.
+    function downTimePhrase() {
+        const v = state.downTime;
+        if (v === 0) return 'witnessed arrest';
+        if (v >= 1 && v <= 30) return `~${v} min prior to arrival`;
+        return 'unknown';
     }
-
-    /** Single-select Suspected Etiology chip — captured in state and surfaced in handoff. */
-    function setEtiology(btn, label) {
-        document.querySelectorAll('.chip-etiology').forEach(el => el.classList.remove('active'));
-        if (state.suspectedEtiology === label) {
-            state.suspectedEtiology = null;
-        } else {
-            btn.classList.add('active');
-            state.suspectedEtiology = label;
-            logPTAEntry(`Suspected etiology: ${label}`);
-        }
+    function updateDowntimeLabel() {
+        const s = document.getElementById('pt-downtime-slider');
+        if (!s) return;
+        const v = parseInt(s.value, 10);
+        state.downTime = v;
+        let txt;
+        if (v === 0) txt = 'Witnessed (0 min)';
+        else if (v === 31) txt = 'Unknown';
+        else txt = `~${v} min`;
+        const lbl = document.getElementById('pt-downtime-label');
+        if (lbl) lbl.textContent = txt;
         refreshHandoffIfVisible();
     }
 
@@ -5661,10 +5666,8 @@
         state.roscRhythm = rhythm;
         logAction(`ROSC underlying rhythm: ${rhythm}`);
         closeModal('modal-rosc-rhythm');
-        // ROSC is the critical moment to recapture ETCO2 — chain the slider so the user
-        // gets a one-tap path to log a fresh value before doing anything else.
-        // Small delay lets the rhythm modal close cleanly before the next modal opens.
-        setTimeout(() => openEtco2Slider(), 250);
+        // No forced ETCO2 chain — recording ETCO2 post-ROSC is optional via the checklist,
+        // so the rhythm step isn't a hard stop into another mandatory screen.
     }
     function log12Lead() {
         const rhythm = document.querySelector('.chip-ecg-rhythm.active')?.innerText || 'Not Specified';
@@ -5791,30 +5794,6 @@
         document.getElementById('vital-spo2').value = '';
         updateMapDisplay();
         showToast('Vitals logged');
-    }
-
-    // --- BVM Ventilations (with adjunct + compliance) ---
-    function openBVM() {
-        closeModal('modal-interventions');
-        document.querySelectorAll('.chip-bvm-adjunct, .chip-bvm-comp').forEach(el => el.classList.remove('active'));
-        openModal('modal-bvm');
-    }
-    function logBVM() {
-        const adjunct = document.querySelector('.chip-bvm-adjunct.active')?.innerText;
-        const comp = document.querySelector('.chip-bvm-comp.active')?.innerText;
-        const details = [];
-        if (adjunct) details.push(adjunct === 'None' ? 'No adjunct' : `Adjunct: ${adjunct}`);
-        if (comp) details.push(`Compliance: ${comp}`);
-        const log = 'BVM Ventilations Initiated' + (details.length ? ` (${details.join(', ')})` : '');
-        logAction(log);
-        closeModal('modal-bvm');
-    }
-
-    // --- Defib Pads (simple one-tap) ---
-    function logDefibPadsSimple() {
-        logAction('Defib Pads Placed');
-        state.defibPads = { placed: true };
-        closeModal('modal-interventions');
     }
 
     function openPacing() {
